@@ -3,6 +3,17 @@ import { searchEntities } from "../api/client";
 
 const ENTITY_TYPE_HINT = "Ej: NEED-001, PRJ-014, INV-032, GRP-009";
 
+function FieldLabel({ children }) {
+  return (
+    <label className="mb-1.5 block font-display text-[11px] font-medium tracking-[0.14em] text-gold-400/70">
+      {children}
+    </label>
+  );
+}
+
+const inputClass =
+  "w-full rounded-lg border border-ink-600 bg-ink-950/70 px-3 py-2 font-body text-[15px] text-parchment-200 outline-none transition placeholder:text-parchment-200/25 focus:border-gold-500/60 focus:shadow-[0_0_0_3px_rgba(204,159,69,0.12)]";
+
 export default function SearchPanel({ onSubmit, loading }) {
   const [mode, setMode] = useState("id"); // "id" | "text" | "pdf"
   const [entityId, setEntityId] = useState("NEED-001");
@@ -59,9 +70,9 @@ export default function SearchPanel({ onSubmit, loading }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-5"
+      className="flex flex-col gap-4 rounded-xl border border-gold-500/15 bg-ink-900/50 p-5 shadow-[0_1px_0_rgba(240,217,163,0.05)_inset]"
     >
-      <div className="flex gap-1 rounded-lg bg-slate-800/70 p-1 text-sm font-medium">
+      <div className="flex gap-1 rounded-lg border border-ink-700 bg-ink-950/50 p-1 font-display text-[13px] font-medium">
         {[
           { key: "id", label: "ID existente" },
           { key: "text", label: "Texto libre" },
@@ -73,8 +84,8 @@ export default function SearchPanel({ onSubmit, loading }) {
             onClick={() => setMode(opt.key)}
             className={`flex-1 rounded-md px-2 py-1.5 transition ${
               mode === opt.key
-                ? "bg-indigo-600 text-white shadow"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-gold-500 text-ink-950 shadow-[0_0_12px_rgba(204,159,69,0.35)]"
+                : "text-parchment-200/40 hover:text-parchment-200/80"
             }`}
           >
             {opt.label}
@@ -84,19 +95,17 @@ export default function SearchPanel({ onSubmit, loading }) {
 
       {mode === "id" && (
         <div className="relative">
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-            ID de entidad
-          </label>
+          <FieldLabel>ID de entidad</FieldLabel>
           <input
             value={entityId}
             onChange={(e) => setEntityId(e.target.value)}
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder={ENTITY_TYPE_HINT}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500"
+            className={`${inputClass} font-mono`}
           />
           {showSuggestions && suggestions.length > 0 && (
-            <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+            <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-ink-600 bg-ink-900 shadow-2xl shadow-black/50">
               {suggestions.map((s) => (
                 <li key={s.id}>
                   <button
@@ -105,12 +114,14 @@ export default function SearchPanel({ onSubmit, loading }) {
                       setEntityId(s.id);
                       setShowSuggestions(false);
                     }}
-                    className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-slate-800"
+                    className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-ink-800"
                   >
-                    <span className="font-mono text-indigo-300">
-                      {s.id} <span className="text-slate-500">· {s.type_label}</span>
+                    <span className="font-mono text-sm text-gold-400">
+                      {s.id} <span className="text-parchment-200/35">· {s.type_label}</span>
                     </span>
-                    <span className="truncate text-xs text-slate-400">{s.name}</span>
+                    <span className="truncate font-body text-xs text-parchment-200/50">
+                      {s.name}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -121,50 +132,38 @@ export default function SearchPanel({ onSubmit, loading }) {
 
       {mode === "text" && (
         <div className="flex flex-col gap-3">
-          <p className="text-xs text-slate-500">
+          <p className="font-body text-xs italic text-parchment-200/40">
             Se trata como necesidad temporal — nunca se escribe en institutional_needs.csv.
           </p>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-              Título
-            </label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
-            />
+            <FieldLabel>Título</FieldLabel>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-              Descripción
-            </label>
+            <FieldLabel>Descripción</FieldLabel>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className={`${inputClass} resize-none`}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-              Contexto (opcional)
-            </label>
+            <FieldLabel>Contexto (opcional)</FieldLabel>
             <textarea
               value={context}
               onChange={(e) => setContext(e.target.value)}
               rows={2}
-              className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className={`${inputClass} resize-none`}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-              Impacto esperado (opcional)
-            </label>
+            <FieldLabel>Impacto esperado (opcional)</FieldLabel>
             <textarea
               value={expectedImpact}
               onChange={(e) => setExpectedImpact(e.target.value)}
               rows={2}
-              className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className={`${inputClass} resize-none`}
             />
           </div>
         </div>
@@ -172,21 +171,21 @@ export default function SearchPanel({ onSubmit, loading }) {
 
       {mode === "pdf" && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-slate-500">
+          <p className="font-body text-xs italic text-parchment-200/40">
             Se extrae el texto vía Docling y se trata como necesidad temporal — nunca se
             persiste, mismo mecanismo que el modo de texto libre.
           </p>
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-700 bg-slate-950 px-3 py-6 text-center transition hover:border-indigo-500">
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-gold-500/25 bg-ink-950/50 px-3 py-7 text-center transition hover:border-gold-500/60 hover:bg-ink-950/70">
             <input
               type="file"
               accept="application/pdf"
               className="hidden"
               onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
             />
-            <span className="text-sm font-medium text-slate-300">
+            <span className="font-display text-sm font-medium text-parchment-200/80">
               {pdfFile ? pdfFile.name : "Click para elegir un PDF"}
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="font-mono text-[11px] text-parchment-200/35">
               {pdfFile ? `${(pdfFile.size / 1024).toFixed(0)} KB` : "Solo .pdf"}
             </span>
           </label>
@@ -194,9 +193,11 @@ export default function SearchPanel({ onSubmit, loading }) {
       )}
 
       <div>
-        <div className="mb-1 flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-400">
-          <span>Resultados</span>
-          <span className="font-mono text-slate-300">{topK}</span>
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="font-display text-[11px] font-medium tracking-[0.14em] text-gold-400/70">
+            Resultados
+          </span>
+          <span className="font-mono text-xs text-parchment-200/60">{topK}</span>
         </div>
         <input
           type="range"
@@ -204,14 +205,14 @@ export default function SearchPanel({ onSubmit, loading }) {
           max={15}
           value={topK}
           onChange={(e) => setTopK(Number(e.target.value))}
-          className="w-full accent-indigo-500"
+          className="w-full accent-gold-500"
         />
       </div>
 
       <button
         type="submit"
         disabled={loading}
-        className="mt-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-1 rounded-lg bg-gold-500 px-4 py-2.5 font-display text-sm font-semibold text-ink-950 shadow-[0_0_18px_rgba(204,159,69,0.28)] transition hover:bg-gold-400 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {loading ? "Procesando en vivo…" : "Buscar conexiones"}
       </button>

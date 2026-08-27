@@ -1,25 +1,40 @@
 import ScoreBreakdown from "./ScoreBreakdown";
 
-const PRIORITY_COLORS = { alta: "#16a34a", media: "#f59e0b", baja: "#9ca3af" };
-const FALLBACK_BAND_COLORS = { alta: "#16a34a", media: "#f59e0b", baja: "#9ca3af" };
+const PRIORITY_COLORS = { alta: "#8fbf7a", media: "#cc9f45", baja: "#7d8798" };
+const FALLBACK_BAND_COLORS = { alta: "#8fbf7a", media: "#cc9f45", baja: "#7d8798" };
+
+function SectionLabel({ children, tag }) {
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <span className="font-display text-[11px] font-medium tracking-[0.14em] text-gold-400/70">
+        {children}
+      </span>
+      {tag && (
+        <span className="rounded border border-ink-600 bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-parchment-200/45">
+          {tag}
+        </span>
+      )}
+    </div>
+  );
+}
 
 function OpportunityCard({ o }) {
-  const color = PRIORITY_COLORS[o.priority] || "#9ca3af";
+  const color = PRIORITY_COLORS[o.priority] || "#7d8798";
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+    <div className="rounded-lg border border-ink-600 bg-ink-950/50 p-3">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-verdigris-400">
           {o.type}
         </span>
         <span
-          className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+          className="rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold"
           style={{ background: `${color}22`, color }}
         >
           prioridad {o.priority}
         </span>
       </div>
-      <p className="text-sm text-slate-200">{o.opportunity}</p>
-      <p className="mt-1 text-xs text-slate-500">razón: {o.reason}</p>
+      <p className="font-body text-[15px] text-parchment-200/90">{o.opportunity}</p>
+      <p className="mt-1 font-body text-xs italic text-parchment-200/40">razón: {o.reason}</p>
     </div>
   );
 }
@@ -45,38 +60,46 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
   return (
     <>
       <div
-        className={`fixed inset-0 z-30 bg-slate-950/60 backdrop-blur-sm transition-opacity ${
+        className={`fixed inset-0 z-30 bg-ink-950/70 backdrop-blur-sm transition-opacity ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onClose}
       />
       <aside
-        className={`fixed right-0 top-0 z-40 h-full w-full max-w-md transform overflow-y-auto border-l border-slate-800 bg-slate-950 p-5 shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed right-0 top-0 z-40 h-full w-full max-w-md transform overflow-y-auto border-l border-gold-500/15 bg-ink-900 p-6 shadow-[0_0_60px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {selectedNodeId && (
-          <>
-            <div className="mb-4 flex items-start justify-between gap-3">
+          <div key={selectedNodeId} className="rise-in">
+            <div className="mb-5 flex items-start justify-between gap-3 border-b border-gold-500/15 pb-4">
               <div>
-                <div className="font-mono text-lg font-bold text-slate-50">{selectedNodeId}</div>
-                <div className="text-xs text-slate-500">{displayTypeLabel}</div>
-                {displayLabel && <p className="mt-1 text-sm text-slate-300">{displayLabel}</p>}
+                <div className="font-mono text-lg font-semibold text-parchment-200">
+                  {selectedNodeId}
+                </div>
+                <div className="mt-0.5 font-display text-xs italic text-gold-400/70">
+                  {displayTypeLabel}
+                </div>
+                {displayLabel && (
+                  <p className="mt-1.5 font-body text-[15px] leading-snug text-parchment-200/80">
+                    {displayLabel}
+                  </p>
+                )}
               </div>
               <button
                 onClick={onClose}
-                className="shrink-0 rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-400 hover:bg-slate-800"
+                className="shrink-0 rounded-lg border border-ink-600 px-2 py-1 font-mono text-xs text-parchment-200/50 transition hover:border-gold-500/40 hover:text-parchment-200"
               >
-                Cerrar ✕
+                ✕
               </button>
             </div>
 
             {isSource && (
-              <div className="rounded-lg border border-indigo-900/50 bg-indigo-950/20 p-3 text-sm text-slate-300">
-                Esta es la entidad consultada — el centro del grafo. Elegí cualquier otro nodo
-                para ver por qué se conecta con ella.
+              <div className="rounded-lg border border-gold-500/20 bg-gold-500/[0.06] p-3.5 font-body text-[15px] text-parchment-200/80">
+                Esta es la entidad consultada — el centro de la constelación. Elegí cualquier
+                otro nodo para leer por qué se conecta con ella.
                 {queryResult?.meta && (
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-2.5 font-mono text-xs text-parchment-200/40">
                     {queryResult.meta.elapsed_seconds}s · {queryResult.meta.total_candidates_scored}{" "}
                     candidatos evaluados
                   </p>
@@ -85,18 +108,16 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
             )}
 
             {!isSource && result && (
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="rounded-full px-2.5 py-1 text-xs font-semibold"
-                    style={{
-                      background: `${colors[result.relevance.label] || "#9ca3af"}22`,
-                      color: colors[result.relevance.label] || "#9ca3af",
-                    }}
-                  >
-                    {result.relevance.label} · {result.relevance.score.toFixed(2)}
-                  </span>
-                </div>
+              <div className="flex flex-col gap-5">
+                <span
+                  className="w-fit rounded-full px-2.5 py-1 font-mono text-xs font-semibold"
+                  style={{
+                    background: `${colors[result.relevance.label] || "#7d8798"}22`,
+                    color: colors[result.relevance.label] || "#7d8798",
+                  }}
+                >
+                  {result.relevance.label} · {result.relevance.score.toFixed(2)}
+                </span>
 
                 <ScoreBreakdown
                   breakdown={result.relevance.breakdown}
@@ -104,36 +125,33 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
                 />
 
                 <div>
-                  <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Explicación
-                    <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
-                      texto generado
-                    </span>
-                  </div>
-                  <p className="text-sm leading-relaxed text-slate-200">{result.explanation}</p>
+                  <SectionLabel tag="texto generado">Explicación</SectionLabel>
+                  <p className="font-body text-[15px] leading-relaxed text-parchment-200/85">
+                    {result.explanation}
+                  </p>
                 </div>
 
                 <div>
-                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Evidencia — cadena de trazabilidad
-                  </div>
+                  <SectionLabel>Evidencia — cadena de trazabilidad</SectionLabel>
                   {result.evidence.length === 0 ? (
-                    <p className="text-xs text-slate-500">Sin evidencia estructurada.</p>
+                    <p className="font-body text-xs italic text-parchment-200/35">
+                      Sin evidencia estructurada.
+                    </p>
                   ) : (
                     <ol className="flex flex-col gap-2">
                       {result.evidence.map((ev, i) => (
                         <li
                           key={i}
-                          className="rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs"
+                          className="rounded-lg border border-ink-600 bg-ink-950/50 p-3 text-xs"
                         >
-                          <div className="mb-1 flex flex-wrap gap-x-2 gap-y-0.5 font-mono text-indigo-300">
+                          <div className="mb-1.5 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-verdigris-400">
                             <span>{ev.file}</span>
-                            <span className="text-slate-600">/</span>
+                            <span className="text-parchment-200/25">/</span>
                             <span>{ev.id}</span>
-                            <span className="text-slate-600">/</span>
+                            <span className="text-parchment-200/25">/</span>
                             <span>{ev.field}</span>
                           </div>
-                          <p className="text-slate-300">{ev.snippet}</p>
+                          <p className="font-body text-[13px] text-parchment-200/70">{ev.snippet}</p>
                         </li>
                       ))}
                     </ol>
@@ -143,7 +161,7 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
             )}
 
             {!isSource && !result && (
-              <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-sm text-slate-300">
+              <div className="rounded-lg border border-ink-600 bg-ink-950/50 p-3.5 font-body text-[15px] text-parchment-200/70">
                 Nodo puente estructural — no es una conexión rankeada directamente, aparece
                 porque forma parte del camino en el grafo institucional que explica la
                 cercanía de otra conexión.
@@ -151,10 +169,8 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
             )}
 
             {relatedOpportunities.length > 0 && (
-              <div className="mt-5">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Oportunidades relacionadas
-                </div>
+              <div className="mt-6">
+                <SectionLabel>Oportunidades relacionadas</SectionLabel>
                 <div className="flex flex-col gap-3">
                   {relatedOpportunities.map((o, i) => (
                     <OpportunityCard key={i} o={o} />
@@ -162,7 +178,7 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </aside>
     </>
