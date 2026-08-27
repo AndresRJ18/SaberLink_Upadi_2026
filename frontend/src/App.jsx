@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiErrorMessage, fetchGraph, fetchLegend, queryPdf, runQuery } from "./api/client";
+import { apiErrorMessage, fetchLegend, queryPdf, runQuery } from "./api/client";
 import CompactRail from "./components/CompactRail";
 import NodeDetailDrawer from "./components/NodeDetailDrawer";
 import SearchPanel from "./components/SearchPanel";
@@ -30,33 +30,20 @@ export default function App() {
     fetchLegend().then(setLegend).catch(() => setLegend(null));
   }, []);
 
-  async function afterResult(result, topK) {
-    setQueryResult(result);
-    setSelectedNodeId(null);
-    setGraphData(null);
-
-    // /graph only supports existing entity_id — a raw_text_profile or PDF
-    // query mints a fresh TEMP-xxxxxxxx id each call that can't be looked
-    // up a second time (same constraint pyvis_export documents).
-    if (result.source.official) {
-      try {
-        const graph = await fetchGraph({ entityId: result.source.id, topK });
-        setGraphData(graph);
-      } catch {
-        setGraphData(null);
-      }
-    }
-  }
-
   async function handleSearch({ entityId, rawTextProfile, pdfFile, topK }) {
     setLoading(true);
     setError(null);
     setGraphData(null);
     try {
+      // The graph now comes back inline with the query result (backend
+      // builds it from the very same run_query() call, so it works for an
+      // ephemeral texto-libre/PDF source too — no second lookup by id).
       const result = pdfFile
         ? await queryPdf({ file: pdfFile, topK })
         : await runQuery({ entityId, rawTextProfile, topK });
-      await afterResult(result, topK);
+      setQueryResult(result);
+      setGraphData(result.graph || null);
+      setSelectedNodeId(null);
     } catch (err) {
       setError(apiErrorMessage(err));
       setQueryResult(null);
@@ -161,7 +148,7 @@ export default function App() {
                   />
                 ) : (
                   <div className="flex h-[70vh] min-h-[420px] items-center justify-center rounded-2xl border border-gold-500/10 bg-ink-900/40 font-body text-sm italic text-parchment-200/40">
-                    Sin grafo disponible para esta consulta temporal.
+                    No se pudo construir el grafo para esta consulta.
                   </div>
                 )}
               </>

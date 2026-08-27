@@ -66,18 +66,35 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+def _build_graph_payload(source_id: str, results: list[dict], source_label: str | None = None) -> dict:
+    """Same discovery-subgraph data saberlink.plus.pyvis_export renders to
+    HTML, as JSON nodes/edges for the frontend's Cytoscape view. Works for
+    an ephemeral TEMP-xxxxxxxx source too (texto libre / PDF): it isn't in
+    graph.gpickle, so graph_query.precompute_source just returns empty
+    paths for it — build_discovery_graph_data then falls back to no hub
+    nodes, but the source + ranked-result star topology still comes
+    through fine, which is what actually matters to the user."""
+    g = _graph()
+    pre = graph_query.precompute_source(g, source_id)
+    return graph_query.build_discovery_graph_data(source_id, results, g, pre, _entity_lookup(), source_label=source_label)
+
+
 @app.post("/query")
 def query(body: QueryRequest) -> dict:
     if not body.entity_id and not body.raw_text_profile:
         raise HTTPException(status_code=400, detail="entity_id o raw_text_profile es requerido")
     try:
-        return pipeline.run_query(
+        out = pipeline.run_query(
             entity_id=body.entity_id,
             raw_text_profile=body.raw_text_profile,
             top_k=body.top_k,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    source_label = (body.raw_text_profile or {}).get("title")
+    out["graph"] = _build_graph_payload(out["source"]["id"], out["results"], source_label=source_label)
+    return out
 
 
 def _parse_and_query_pdf(tmp_path: Path, top_k: int) -> dict:
@@ -89,7 +106,9 @@ def _parse_and_query_pdf(tmp_path: Path, top_k: int) -> dict:
     from saberlink.plus.docling_intake import pdf_to_temp_need
 
     profile = pdf_to_temp_need(tmp_path)
-    return pipeline.run_query(raw_text_profile=profile, top_k=top_k)
+    out = pipeline.run_query(raw_text_profile=profile, top_k=top_k)
+    out["graph"] = _build_graph_payload(out["source"]["id"], out["results"], source_label=profile.get("title"))
+    return out
 
 
 @app.post("/query/pdf")
@@ -116,19 +135,19 @@ def graph(
     entity_id: str = Query(..., description="ID de entidad existente, ej. NEED-001"),
     top_k: int = Query(config.DEFAULT_TOP_K, ge=1, le=50),
 ) -> dict:
-    """Same discovery-subgraph data saberlink.plus.pyvis_export renders to
-    HTML, returned as JSON nodes/edges for the frontend's Cytoscape view.
-    Only accepts an existing entity_id (not raw_text_profile) — a temporary
-    NEED's TEMP-xxxxxxxx id can't be looked up a second time, same
-    constraint pyvis_export.export_discovery_graph documents."""
+    """Standalone equivalent of the `graph` field POST /query now returns
+    inline — kept as its own endpoint for API completeness (e.g. fetching
+    just the graph without the full explanation/evidence payload). Only
+    accepts an existing entity_id: a texto libre / PDF query's ephemeral
+    TEMP-xxxxxxxx id can't be looked up a second time in a fresh call —
+    use POST /query or /query/pdf for those, which build the graph from
+    the same call that creates the temporary entity."""
     try:
         out = pipeline.run_query(entity_id=entity_id, top_k=top_k)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    g = _graph()
-    pre = graph_query.precompute_source(g, out["source"]["id"])
-    return graph_query.build_discovery_graph_data(out["source"]["id"], out["results"], g, pre, _entity_lookup())
+    return _build_graph_payload(out["source"]["id"], out["results"])
 
 
 @app.get("/entities")
