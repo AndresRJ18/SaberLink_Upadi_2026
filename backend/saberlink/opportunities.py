@@ -185,9 +185,13 @@ def rule_knowledge_transfer(source_id, entities, ranked_by_type, source_faculty_
 
 
 def rule_thesis_opportunity(source_id, entities, ranked_by_type) -> dict | None:
-    has_project_antecedent = any(c.score >= config.SIG_T for c in ranked_by_type.get("PRJ", []))
-    if has_project_antecedent:
-        return None
+    # Previously gated on "no strong project antecedent", to avoid ever
+    # suggesting a thesis topic alongside a RESEARCH_CONTINUITY opportunity.
+    # That made this rule fire on only a minority of queries — the official
+    # brief explicitly names "oportunidad de trabajo de grado" as one of the
+    # flagship opportunity categories, so it should surface whenever a
+    # genuinely relevant thesis antecedent exists, independent of whatever
+    # other opportunities also fired for the same query.
     for c in _above(ranked_by_type.get("THS", []), config.DOMAIN_T):
         program_id = _attr(entities, c.entity_id, "program_id")
         if program_id and str(_attr(entities, program_id, "active")).lower() == "true":
@@ -195,7 +199,7 @@ def rule_thesis_opportunity(source_id, entities, ranked_by_type) -> dict | None:
                 "opportunity": f"Proponer un trabajo de grado a partir de {c.entity_id} para {source_id}.",
                 "type": "THESIS_OPPORTUNITY",
                 "related_entities": [source_id, c.entity_id, program_id],
-                "reason": "Tesis afín sin antecedente de proyecto fuerte; programa activo.",
+                "reason": "Tesis afín con dominio compatible, en un programa activo.",
                 "priority": c.label_absolute,
                 "evidence": [{"id": c.entity_id, "score": round(c.score, 4)}],
             }
