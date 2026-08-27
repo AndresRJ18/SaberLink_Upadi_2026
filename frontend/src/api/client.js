@@ -13,6 +13,16 @@ export async function runQuery({ entityId, rawTextProfile, topK }) {
   return data;
 }
 
+export async function queryPdf({ file, topK }) {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await client.post("/query/pdf", form, {
+    params: { top_k: topK },
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
 export async function fetchGraph({ entityId, topK }) {
   const { data } = await client.get("/graph", {
     params: { entity_id: entityId, top_k: topK },

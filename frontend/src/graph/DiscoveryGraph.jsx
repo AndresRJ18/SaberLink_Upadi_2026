@@ -36,6 +36,7 @@ function toElements(graphData) {
       label: n.label,
       color: n.color,
       role: n.role,
+      entityType: n.type,
       typeLabel: n.type_label,
       shape: TYPE_SHAPES[n.type] || "ellipse",
       size: ROLE_SIZE[n.role] || 30,
@@ -86,6 +87,10 @@ const STYLESHEET = [
     style: { "font-size": 7, opacity: 0.75 },
   },
   {
+    selector: "node.selected",
+    style: { "border-width": 4, "border-color": "#818cf8" },
+  },
+  {
     selector: "edge",
     style: {
       width: 1.5,
@@ -132,7 +137,7 @@ const STYLESHEET = [
 // own diff (patch.js: shallowObjDiff on the `layout` prop) to call
 // cy.layout(...).run() again — recomputed only when the actual graph data
 // changes, via the [elements] dependency, never on unrelated re-renders
-// (e.g. toggling a band filter chip).
+// (e.g. toggling a band filter chip or selecting a node).
 function useDiscoveryLayout(elements) {
   return useMemo(() => {
     if (elements.length === 0) return { name: "preset" };
@@ -142,7 +147,7 @@ function useDiscoveryLayout(elements) {
       animationDuration: 400,
       randomize: true,
       fit: true,
-      padding: 48,
+      padding: 56,
       nodeDimensionsIncludeLabels: true,
       nodeRepulsion: 9000,
       idealEdgeLength: 110,
@@ -151,7 +156,13 @@ function useDiscoveryLayout(elements) {
   }, [elements]);
 }
 
-export default function DiscoveryGraph({ graphData, legend }) {
+/**
+ * Controlled by `selectedNodeId`/`onSelectNode` so the same selection can be
+ * driven either by clicking a node here or a row in the rail list (App.jsx
+ * owns the single source of truth). Clicking a node (or a rail row) both
+ * fades non-neighbors here AND surfaces that node's detail in App's drawer.
+ */
+export default function DiscoveryGraph({ graphData, legend, selectedNodeId, onSelectNode }) {
   const cyRef = useRef(null);
   const [activeBands, setActiveBands] = useState(new Set(BANDS));
   const elements = useMemo(() => toElements(graphData), [graphData]);
@@ -165,6 +176,22 @@ export default function DiscoveryGraph({ graphData, legend }) {
       edge.toggleClass("hidden-band", band && !activeBands.has(band));
     });
   }, [activeBands, elements]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.elements().removeClass("selected");
+    if (!selectedNodeId) {
+      cy.elements().removeClass("faded");
+      return;
+    }
+    const node = cy.getElementById(selectedNodeId);
+    if (node.empty()) return;
+    node.addClass("selected");
+    const neighborhood = node.closedNeighborhood();
+    cy.elements().addClass("faded");
+    neighborhood.removeClass("faded");
+  }, [selectedNodeId, elements]);
 
   function toggleBand(band) {
     setActiveBands((prev) => {
@@ -186,22 +213,15 @@ export default function DiscoveryGraph({ graphData, legend }) {
     // cy instance (after a StrictMode remount) still gets wired up once.
     if (cy.scratch("_saberlinkBound")) return;
     cy.scratch("_saberlinkBound", true);
-    cy.on("tap", "node", (evt) => {
-      const node = evt.target;
-      const neighborhood = node.closedNeighborhood();
-      cy.elements().addClass("faded");
-      neighborhood.removeClass("faded");
-    });
+    cy.on("tap", "node", (evt) => onSelectNode?.(evt.target.id()));
     cy.on("tap", (evt) => {
-      if (evt.target === cy) {
-        cy.elements().removeClass("faded");
-      }
+      if (evt.target === cy) onSelectNode?.(null);
     });
   }
 
   if (!graphData) {
     return (
-      <div className="flex h-[560px] items-center justify-center rounded-xl border border-dashed border-slate-800 text-sm text-slate-500">
+      <div className="flex h-[70vh] min-h-[420px] items-center justify-center rounded-xl border border-dashed border-slate-800 text-sm text-slate-500">
         El grafo de descubrimiento aparece acá después de una búsqueda.
       </div>
     );
@@ -241,7 +261,7 @@ export default function DiscoveryGraph({ graphData, legend }) {
         elements={elements}
         stylesheet={STYLESHEET}
         layout={layout}
-        style={{ width: "100%", height: "560px" }}
+        style={{ width: "100%", height: "70vh", minHeight: "420px" }}
         cy={handleCyInit}
         wheelSensitivity={0.2}
       />

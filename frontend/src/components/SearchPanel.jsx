@@ -4,7 +4,7 @@ import { searchEntities } from "../api/client";
 const ENTITY_TYPE_HINT = "Ej: NEED-001, PRJ-014, INV-032, GRP-009";
 
 export default function SearchPanel({ onSubmit, loading }) {
-  const [mode, setMode] = useState("id"); // "id" | "text"
+  const [mode, setMode] = useState("id"); // "id" | "text" | "pdf"
   const [entityId, setEntityId] = useState("NEED-001");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -12,6 +12,7 @@ export default function SearchPanel({ onSubmit, loading }) {
   const [description, setDescription] = useState("");
   const [context, setContext] = useState("");
   const [expectedImpact, setExpectedImpact] = useState("");
+  const [pdfFile, setPdfFile] = useState(null);
   const [topK, setTopK] = useState(8);
   const debounceRef = useRef(null);
 
@@ -38,7 +39,7 @@ export default function SearchPanel({ onSubmit, loading }) {
     if (mode === "id") {
       if (!entityId.trim()) return;
       onSubmit({ entityId: entityId.trim(), topK });
-    } else {
+    } else if (mode === "text") {
       if (!description.trim()) return;
       onSubmit({
         rawTextProfile: {
@@ -49,6 +50,9 @@ export default function SearchPanel({ onSubmit, loading }) {
         },
         topK,
       });
+    } else {
+      if (!pdfFile) return;
+      onSubmit({ pdfFile, topK });
     }
   }
 
@@ -61,12 +65,13 @@ export default function SearchPanel({ onSubmit, loading }) {
         {[
           { key: "id", label: "ID existente" },
           { key: "text", label: "Texto libre" },
+          { key: "pdf", label: "Subir PDF" },
         ].map((opt) => (
           <button
             key={opt.key}
             type="button"
             onClick={() => setMode(opt.key)}
-            className={`flex-1 rounded-md px-3 py-1.5 transition ${
+            className={`flex-1 rounded-md px-2 py-1.5 transition ${
               mode === opt.key
                 ? "bg-indigo-600 text-white shadow"
                 : "text-slate-400 hover:text-slate-200"
@@ -77,7 +82,7 @@ export default function SearchPanel({ onSubmit, loading }) {
         ))}
       </div>
 
-      {mode === "id" ? (
+      {mode === "id" && (
         <div className="relative">
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
             ID de entidad
@@ -112,7 +117,9 @@ export default function SearchPanel({ onSubmit, loading }) {
             </ul>
           )}
         </div>
-      ) : (
+      )}
+
+      {mode === "text" && (
         <div className="flex flex-col gap-3">
           <p className="text-xs text-slate-500">
             Se trata como necesidad temporal — nunca se escribe en institutional_needs.csv.
@@ -160,6 +167,29 @@ export default function SearchPanel({ onSubmit, loading }) {
               className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
             />
           </div>
+        </div>
+      )}
+
+      {mode === "pdf" && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-slate-500">
+            Se extrae el texto vía Docling y se trata como necesidad temporal — nunca se
+            persiste, mismo mecanismo que el modo de texto libre.
+          </p>
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-700 bg-slate-950 px-3 py-6 text-center transition hover:border-indigo-500">
+            <input
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+            />
+            <span className="text-sm font-medium text-slate-300">
+              {pdfFile ? pdfFile.name : "Click para elegir un PDF"}
+            </span>
+            <span className="text-xs text-slate-500">
+              {pdfFile ? `${(pdfFile.size / 1024).toFixed(0)} KB` : "Solo .pdf"}
+            </span>
+          </label>
         </div>
       )}
 
