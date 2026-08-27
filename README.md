@@ -32,10 +32,13 @@ saberlink/
 | Frontend | React + Vite + Tailwind + Cytoscape.js |
 | Interfaz alternativa [PLUS] | Streamlit + pyvis, Jupyter Notebook |
 | PDF de usuario [PLUS] | Docling |
+| IA generativa [PLUS], opcional | AWS Bedrock — Amazon Nova 2 Lite |
 
-No se usa ningún LLM en ningún punto del pipeline — la explicación en texto es
-100% generada por templates de string sobre el breakdown ya calculado, nunca
-por un modelo generativo. Sin cloud deploy — corre local.
+El descubrimiento, scoring y generación de oportunidades no usan ningún LLM
+— la explicación y la oportunidad son 100% templates de string sobre el
+breakdown ya calculado. Un modelo generativo (AWS Bedrock, opcional, ver
+sección [PLUS]) solo puede redactar de nuevo una oportunidad ya calculada,
+bajo pedido explícito del usuario.
 
 ## Instalación
 
@@ -50,6 +53,11 @@ Requiere Python 3.11+. La primera vez que se use el modelo de embeddings,
 `HF_TOKEN` para uso anónimo (con límite de tasa más bajo).
 
 Colocá el dataset oficial en `data/raw/` — ver [`data/README.md`](data/README.md).
+
+Para el botón opcional "Generar con IA" (AWS Bedrock), copiá
+`backend/.env.example` a `backend/.env` y completá tu API key — sin esto,
+ese botón simplemente cae al texto de plantilla, el resto de la solución
+funciona igual.
 
 ## Cómo reproducir la demo, de cero
 
@@ -89,9 +97,12 @@ npm install
 npm run dev
 ```
 
-Abre `http://localhost:5173`. Permite buscar por ID o texto libre, ver el
-ranking, la explicación/evidencia, las oportunidades generadas y el grafo de
-descubrimiento interactivo (Cytoscape.js).
+Abre `http://localhost:5173`. Permite buscar por ID, texto libre o subir un
+PDF; el resultado principal es el grafo de descubrimiento (Cytoscape.js,
+estilo mapa bibliométrico — círculos por tipo de entidad, tamaño por score).
+Hacer click en cualquier nodo (o en el ranking compacto de la izquierda)
+abre el panel de detalle con explicación, evidencia y oportunidades
+generadas, con el botón opcional "Generar con IA" sobre cada oportunidad.
 
 ## Mecanismo de descubrimiento y priorización
 
@@ -175,6 +186,24 @@ python -m saberlink.plus.pyvis_export NEED-001 ego
 # vista alterna: vecindario crudo del grafo institucional (radio 2, sin filtrar)
 ```
 
+**Redacción de oportunidades con IA (AWS Bedrock, opcional)**
+
+```python
+from saberlink.plus.opportunity_phrasing import generate_opportunity_phrasing
+
+result = generate_opportunity_phrasing(opportunity, entity_lookup)
+print(result)  # {"title": "...", "generated_by_ai": True, "model": "us.amazon.nova-2-lite-v1:0"}
+```
+
+Botón "✨ Generar con IA" en cualquier tarjeta de oportunidad del frontend.
+El modelo (Amazon Nova 2 Lite vía Bedrock) **nunca decide una conexión ni un
+score** — solo redacta en 1-2 frases una oportunidad que `opportunities.py`
+ya calculó, a partir únicamente de los campos de texto de las entidades en
+`related_entities` (vía `schema.ENTITY_SPECS`). Si Bedrock falla o no está
+configurado, cae al texto de plantilla (`generated_by_ai: false`) sin
+romper nada. Requiere `AWS_BEARER_TOKEN_BEDROCK` en `backend/.env` — ver
+`backend/.env.example`.
+
 **Interfaz Streamlit (respaldo si el frontend React no está disponible)**
 
 ```powershell
@@ -216,17 +245,19 @@ python -m pytest -q
   vía ONNX Runtime) — usados únicamente para extraer texto de un PDF subido
   por el usuario, nunca para inferir relaciones institucionales.
 - **IA generativa (PLUS, opcional): AWS Bedrock, `Amazon Nova 2 Lite`**
-  (`backend/saberlink/plus/thesis_topic.py`), usada **exclusivamente** para
-  redactar el título de una oportunidad de tipo `THESIS_OPPORTUNITY` ya
-  calculada — nunca decide qué está conectado con qué, nunca calcula un
-  score, nunca corre en el descubrimiento/scoring/ranking del núcleo. Recibe
-  solo texto ya verificado (campos de la necesidad y de la tesis relacionada)
-  y no se activa salvo que el usuario lo pida explícitamente en la interfaz.
-  Si falla o no está configurado, cae automáticamente al texto de plantilla
-  existente. En la respuesta y en la UI queda marcado `generated_by_ai: true`
-  / etiqueta "generado por IA", distinto de `generated_text: true` (que es
-  texto de plantilla, no generativo) — para que evidencia institucional y
-  contenido generado nunca se confundan.
+  (`backend/saberlink/plus/opportunity_phrasing.py`), usada **exclusivamente**
+  para redactar en lenguaje natural una oportunidad **ya calculada** por
+  `opportunities.py` (cualquier tipo: continuidad de investigación,
+  colaboración, integración curricular, tema de tesis, etc.) — nunca decide
+  qué está conectado con qué, nunca calcula un score, nunca corre en el
+  descubrimiento/scoring/ranking del núcleo. Recibe solo texto ya verificado
+  de las entidades en `related_entities` y no se activa salvo que el usuario
+  lo pida explícitamente en la interfaz. Si falla o no está configurado, cae
+  automáticamente al texto de plantilla existente. En la respuesta y en la
+  UI queda marcado `generated_by_ai: true` / etiqueta "generado por IA",
+  distinto de `generated_text: true` (que es texto de plantilla, no
+  generativo) — para que evidencia institucional y contenido generado nunca
+  se confundan.
 - Fuera de eso: sin APIs externas, sin servicios cloud, sin LLM en el
   descubrimiento, scoring, evidencia u oportunidades del núcleo.
 - Sin datasets complementarios — todo el conocimiento viene de Data V1.0.
