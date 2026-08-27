@@ -54,8 +54,7 @@ class QueryRequest(BaseModel):
     top_k: int = config.DEFAULT_TOP_K
 
 
-class ThesisTopicRequest(BaseModel):
-    source_id: str
+class OpportunityPhrasingRequest(BaseModel):
     opportunity: dict
 
 
@@ -114,19 +113,20 @@ def query(body: QueryRequest) -> dict:
     return out
 
 
-@app.post("/opportunities/thesis-topic")
-def thesis_topic(body: ThesisTopicRequest) -> dict:
-    """[PLUS] Rephrases an already-computed THESIS_OPPORTUNITY (from
+@app.post("/opportunities/phrase")
+def phrase_opportunity(body: OpportunityPhrasingRequest) -> dict:
+    """[PLUS] Rephrases any already-computed opportunity (from
     saberlink.opportunities, returned inline by /query) into a natural
-    thesis-topic title via Bedrock. Never re-derives the connection itself —
-    see saberlink/plus/thesis_topic.py's module docstring. Only works for a
-    persisted entity_id (the ephemeral TEMP-xxxxxxxx source from texto libre
-    /PDF isn't in the cached entity lookup, same constraint /graph
-    documents) — falls back to the template title in that case, same as any
-    other Bedrock failure mode."""
-    from saberlink.plus.thesis_topic import generate_thesis_topic
+    sentence via Bedrock. Never re-derives the connection itself — see
+    saberlink/plus/opportunity_phrasing.py's module docstring. Entities that
+    are only ephemeral (the TEMP-xxxxxxxx source from a texto libre/PDF
+    query isn't in the cached entity lookup, same constraint /graph
+    documents) are simply skipped when building context — falls back to the
+    template text if that leaves nothing to work with, same as any other
+    Bedrock failure mode."""
+    from saberlink.plus.opportunity_phrasing import generate_opportunity_phrasing
 
-    return generate_thesis_topic(body.source_id, body.opportunity, _entity_lookup())
+    return generate_opportunity_phrasing(body.opportunity, _entity_lookup())
 
 
 def _parse_and_query_pdf(tmp_path: Path, top_k: int) -> dict:

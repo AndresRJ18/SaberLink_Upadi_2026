@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiErrorMessage, generateThesisTopic } from "../api/client";
+import { apiErrorMessage, generateOpportunityPhrasing } from "../api/client";
 import ScoreBreakdown from "./ScoreBreakdown";
 
 const PRIORITY_COLORS = { alta: "#8fbf7a", media: "#cc9f45", baja: "#7d8798" };
@@ -20,18 +20,17 @@ function SectionLabel({ children, tag }) {
   );
 }
 
-function OpportunityCard({ o, sourceId }) {
+function OpportunityCard({ o }) {
   const color = PRIORITY_COLORS[o.priority] || "#7d8798";
   const [aiTitle, setAiTitle] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const isThesis = o.type === "THESIS_OPPORTUNITY";
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     try {
-      const result = await generateThesisTopic({ sourceId, opportunity: o });
+      const result = await generateOpportunityPhrasing({ opportunity: o });
       if (result.generated_by_ai) {
         setAiTitle(result);
       } else {
@@ -75,13 +74,13 @@ function OpportunityCard({ o, sourceId }) {
       )}
       <p className="mt-1 font-body text-xs italic text-parchment-200/40">razón: {o.reason}</p>
 
-      {isThesis && !aiTitle && (
+      {!aiTitle && (
         <button
           onClick={handleGenerate}
           disabled={loading}
           className="mt-2.5 rounded-full border border-copper-500/40 px-2.5 py-1 font-mono text-[11px] font-semibold text-copper-400 transition hover:bg-copper-500/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "Generando…" : "✨ Generar tema con IA"}
+          {loading ? "Generando…" : "✨ Generar con IA"}
         </button>
       )}
       {error && <p className="mt-1.5 font-body text-xs italic text-copper-500/70">{error}</p>}
@@ -223,7 +222,7 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
                 <SectionLabel>Oportunidades relacionadas</SectionLabel>
                 <div className="flex flex-col gap-3">
                   {relatedOpportunities.map((o, i) => (
-                    <OpportunityCard key={i} o={o} sourceId={queryResult?.source?.id} />
+                    <OpportunityCard key={i} o={o} />
                   ))}
                 </div>
               </div>

@@ -37,11 +37,8 @@ export async function searchEntities({ type, q, limit = 8 } = {}) {
   return data;
 }
 
-export async function generateThesisTopic({ sourceId, opportunity }) {
-  const { data } = await client.post("/opportunities/thesis-topic", {
-    source_id: sourceId,
-    opportunity,
-  });
+export async function generateOpportunityPhrasing({ opportunity }) {
+  const { data } = await client.post("/opportunities/phrase", { opportunity });
   return data;
 }
 
