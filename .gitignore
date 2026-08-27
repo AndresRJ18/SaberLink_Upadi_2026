@@ -1,0 +1,28 @@
+# Regenerable artifacts — 100% rebuildable from data/raw via
+# `python -m saberlink.ingest && python -m saberlink.domain_vocab && \
+#  python -m saberlink.vector_store && python -m saberlink.graph_build`
+backend/processed/
+
+# Raw dataset — synthetic hackathon data, not redistributed by default.
+# See data/README.md for how to place it locally.
+data/raw/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

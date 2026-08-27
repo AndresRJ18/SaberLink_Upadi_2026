@@ -1,0 +1,14 @@
+# Núcleo — requerido siempre
+pandas==3.0.2
+numpy==2.4.3
+pyarrow==25.0.1
+networkx==3.6.1
+chromadb==1.5.9
+sentence-transformers==6.0.0
+torch==2.13.0
+pytest==8.3.3
+
+# [PLUS] — opcional, el núcleo funciona sin esto
+docling==2.123.0
+pyvis==0.3.2
+streamlit==1.62.0
