@@ -14,6 +14,11 @@ services:
     environment:
       SABERLINK_DATA_ROOT: /app/data_raw
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # [PLUS] optional — the "Generar con IA" button falls back to the
+      # template text if these are unset, nothing else depends on them.
+      AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.amazon.nova-2-lite-v1:0}
     restart: unless-stopped
 
   frontend:

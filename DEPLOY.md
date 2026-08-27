@@ -50,6 +50,12 @@ En la pestaña **Environment** del servicio Compose, agregá:
 VITE_API_BASE=https://<url-que-dokploy-asignó-al-backend>
 CORS_ORIGINS=https://<url-que-dokploy-asignó-al-frontend>
 SABERLINK_DATA_DIR=../files/data_raw
+
+# [PLUS] opcional — sin esto, el botón "Generar con IA" simplemente cae al
+# texto de plantilla; nada más depende de estas tres.
+AWS_BEARER_TOKEN_BEDROCK=<tu-api-key-de-bedrock>
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=us.amazon.nova-2-lite-v1:0
 ```
 
 **Importante:** `VITE_API_BASE` se hornea en el bundle de JS al momento del
