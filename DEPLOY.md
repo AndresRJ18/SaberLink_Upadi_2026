@@ -1,106 +1,121 @@
-# Deploy en CubePath (o cualquier VPS con Docker)
+# Deploy en CubePath vía Dokploy
 
-El repo corre en dos contenedores (`docker-compose.yml`): `backend` (FastAPI,
-puerto 8000) y `frontend` (build estático servido por Nginx, puerto 80). El
-dataset y los artefactos derivados (`processed/`) **nunca van dentro de la
-imagen ni del repo** — viven en el disco del VPS, montados como volúmenes.
+Tu VPS (`vps23841.cubepath.net`) corre **Dokploy** — un panel que despliega
+`docker-compose.yml` directo desde GitHub, en vez de entrar por SSH a correr
+`docker compose up` a mano. Esta guía usa ese flujo.
 
-## 1. En tu máquina: push a GitHub
+El repo tiene dos servicios (`docker-compose.yml`): `backend` (FastAPI,
+puerto interno 8000) y `frontend` (build estático servido por Nginx, puerto
+interno 80). El dataset y `processed/` (embeddings, grafo) **nunca van en la
+imagen ni en el repo** — viven en el disco del VPS.
 
-Esto lo hacés vos con tus propios comandos de git (crear el repo, `git remote
-add origin ...`, `git push`).
+## Cómo maneja Dokploy los archivos (importante)
 
-## 2. En el VPS: clonar y preparar Docker
+Dokploy clona tu repo en `/etc/dokploy/compose/<nombre-app>/code/` — esa
+carpeta **se borra y se re-clona en cada deploy**. Lo único que sobrevive
+entre deploys es:
+
+- `/etc/dokploy/compose/<nombre-app>/files/` — carpeta persistente que provee
+  Dokploy (por eso el bind mount del dataset usa `../files/...`, nunca una
+  ruta absoluta).
+- Los **volúmenes con nombre** de Docker (nuestro `backend_processed` ya está
+  definido así en `docker-compose.yml` — sobrevive sin hacer nada extra).
+
+## 1. Crear el proyecto en Dokploy
+
+En `http://vps23841.cubepath.net:3000`:
+
+1. **Create Project** → dentro, **Create Service → Compose**.
+2. Conectá el repo de GitHub: `AndresRJ18/SaberLink_Upadi_2026`, rama `dev`.
+3. Compose Path: `docker-compose.yml` (está en la raíz del repo).
+4. Anotá el **nombre** que le pusiste al servicio — lo vas a necesitar para
+   el paso 3 (define la carpeta `/etc/dokploy/compose/<ese-nombre>/`).
+
+## 2. Configurar dominios (antes de las env vars — el orden importa)
+
+En la pestaña **Domains** del servicio, asigná un dominio/subdominio a cada
+contenedor:
+
+- `frontend` → puerto interno **80**
+- `backend` → puerto interno **8000**
+
+Dokploy te da la URL final (con HTTPS via Let's Encrypt) para cada uno.
+Anotá las dos URLs — las necesitás en el paso siguiente.
+
+## 3. Variables de entorno
+
+En la pestaña **Environment** del servicio Compose, agregá:
+
+```
+VITE_API_BASE=https://<url-que-dokploy-asignó-al-backend>
+CORS_ORIGINS=https://<url-que-dokploy-asignó-al-frontend>
+SABERLINK_DATA_DIR=../files/data_raw
+```
+
+**Importante:** `VITE_API_BASE` se hornea en el bundle de JS al momento del
+build del frontend — si la cambiás después de un primer deploy, hay que
+volver a deployar (no alcanza con reiniciar) para que tome efecto.
+
+## 4. Subir el dataset (no va por git ni por la UI de Dokploy)
+
+Hacé un primer **Deploy** desde el dashboard (va a fallar al armar
+`processed/` porque todavía no hay dataset — es esperado). Eso crea la
+carpeta `/etc/dokploy/compose/<nombre-app>/`. Ahora, por SSH, creá la carpeta
+persistente:
 
 ```bash
-ssh tu-usuario@tu-vps
-git clone <url-de-tu-repo> saberlink
-cd saberlink
-
-# Si el VPS no tiene Docker todavía:
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER   # cerrar sesión y volver a entrar después de esto
+ssh root@144.225.147.4
+mkdir -p /etc/dokploy/compose/<nombre-app>/files/data_raw
+exit
 ```
 
-## 3. Subir el dataset al VPS (no va por git)
-
-Desde tu máquina local, no desde el VPS:
+Y desde tu máquina local (no desde el VPS):
 
 ```bash
-scp -r data/raw tu-usuario@tu-vps:~/saberlink/data/raw
+scp -r data/raw/* root@144.225.147.4:/etc/dokploy/compose/<nombre-app>/files/data_raw/
 ```
 
-(o `rsync -av data/raw/ tu-usuario@tu-vps:~/saberlink/data/raw/` si preferís)
+## 5. Redeploy
 
-## 4. Configurar el `.env` de producción
+Botón **Deploy** de nuevo en Dokploy. Esta vez el backend encuentra el
+dataset en `../files/data_raw` y arma `processed/` (1-2 min: descarga el
+modelo de embeddings + reembebe ~10.7k campos) antes de levantar la API. Se
+ve en la pestaña **Deployments** del servicio, en vivo.
 
-En el VPS, dentro de `saberlink/`:
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-Completá con la IP o dominio real del VPS:
-
-```
-VITE_API_BASE=http://TU_IP_O_DOMINIO:8000
-CORS_ORIGINS=http://TU_IP_O_DOMINIO
-```
-
-**Importante:** `VITE_API_BASE` se hornea en el bundle de JS durante el build
-del frontend — si lo cambiás después, hay que reconstruir la imagen del
-frontend (`docker compose build frontend`), no alcanza con reiniciar.
-
-## 5. Levantar todo
-
-```bash
-docker compose up -d --build
-```
-
-La primera vez, el backend tarda 1-2 minutos extra en arrancar: no encuentra
-`processed/` en el volumen recién creado, así que corre
-`ingest → domain_vocab → vector_store → graph_build` automáticamente antes de
-levantar la API (ver `backend/entrypoint.sh`). Las próximas veces que
-reinicies el contenedor, ese paso se salta — `processed/` queda persistido en
-el volumen de Docker.
-
-Ver logs mientras arranca:
-
-```bash
-docker compose logs -f backend
-```
+Los próximos deploys (por cambios de código) no repiten ese paso —
+`processed/` queda en el volumen `backend_processed`, que Dokploy no toca.
 
 ## 6. Verificar
 
 ```bash
-curl http://localhost:8000/health
+curl https://<url-del-backend>/health
 ```
 
-Y abrir `http://TU_IP_O_DOMINIO` en el navegador.
+Y abrir la URL del frontend en el navegador.
 
-## Actualizar después de un cambio de código
+## Si cambiás el dataset más adelante
+
+Hay que borrar el volumen para que se regenere (si no, el backend sigue
+usando el `processed/` viejo):
 
 ```bash
-git pull
-docker compose up -d --build
+ssh root@144.225.147.4
+docker volume ls | grep backend_processed   # confirmar el nombre exacto
+docker volume rm <nombre-del-volumen>
 ```
 
-`processed/` no se toca (sigue en el volumen) salvo que borres el volumen
-explícitamente (`docker compose down -v`) o cambies el dataset en
-`data/raw/` — en ese caso hay que borrar el volumen para que se regenere:
-
-```bash
-docker compose down
-docker volume rm saberlink_backend_processed
-docker compose up -d --build
-```
+Y volver a **Deploy** desde Dokploy.
 
 ## Notas
 
 - **Docling (modo PDF):** los modelos de layout/OCR se descargan la primera
-  vez que alguien sube un PDF, no al construir la imagen. La primera subida
+  vez que alguien sube un PDF, no al construir la imagen — la primera subida
   va a tardar más que las siguientes.
 - **Nada de esto toca las revisiones en vivo del hackathon** — seguís
-  pudiendo correr todo local con `uvicorn` + `npm run dev` como hasta ahora
-  (ver el README principal). Esto es un link público adicional.
+  pudiendo correr todo local con `uvicorn` + `npm run dev` (ver el README
+  principal). Esto es un link público adicional.
+- Si en algún momento preferís saltarte Dokploy y correr `docker compose up`
+  directo por SSH (sin pasar por su UI), el `docker-compose.yml` y
+  `.env.example` del repo ya sirven para eso tal cual — solo que ahí
+  `SABERLINK_DATA_DIR` sería `./data/raw` (el default) en vez de
+  `../files/data_raw`.
