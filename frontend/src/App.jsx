@@ -72,7 +72,7 @@ export default function App() {
             </h1>
             <p className="mt-1.5 max-w-2xl font-body text-[15px] leading-relaxed text-parchment-200/60">
               Dado un ID, texto libre o un PDF, SaberLink traza la constelación de conexiones
-              en vivo. Elegí cualquier estrella del mapa para leer su relación.
+              en vivo. Elige cualquier estrella del mapa para leer su relación.
             </p>
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function App() {
               <div className="relative flex h-[70vh] min-h-[420px] items-center justify-center overflow-hidden rounded-2xl border border-gold-500/10 bg-ink-900/40">
                 <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:radial-gradient(var(--color-ink-500)_0.6px,transparent_0.6px)] [background-size:22px_22px]" />
                 <p className="relative max-w-sm text-center font-body text-[15px] italic text-parchment-200/50">
-                  Buscá un ID, describí una necesidad o subí un PDF para trazar la red de
+                  Busca un ID, describe una necesidad o sube un PDF para trazar la red de
                   conexiones.
                 </p>
               </div>
@@ -135,7 +135,7 @@ export default function App() {
                   <span>{queryResult.meta.elapsed_seconds}s</span>
                   <span>{queryResult.meta.total_candidates_scored} candidatos evaluados</span>
                   <span className="ml-auto italic text-gold-400/70">
-                    Elegí un nodo para ver su detalle →
+                    Elige un nodo para ver su detalle →
                   </span>
                 </div>
 

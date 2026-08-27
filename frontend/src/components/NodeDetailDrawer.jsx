@@ -96,7 +96,7 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
 
             {isSource && (
               <div className="rounded-lg border border-gold-500/20 bg-gold-500/[0.06] p-3.5 font-body text-[15px] text-parchment-200/80">
-                Esta es la entidad consultada — el centro de la constelación. Elegí cualquier
+                Esta es la entidad consultada — el centro de la constelación. Elige cualquier
                 otro nodo para leer por qué se conecta con ella.
                 {queryResult?.meta && (
                   <p className="mt-2.5 font-mono text-xs text-parchment-200/40">
