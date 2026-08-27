@@ -21,9 +21,15 @@ from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Loads backend/.env (gitignored) into the process environment for local dev —
+# in Docker/Dokploy, env vars come from docker-compose's environment/env_file
+# instead, and load_dotenv() is a harmless no-op there (no .env file present).
+load_dotenv()
 
 from saberlink import config, entity_lookup as entity_lookup_mod, graph_build, graph_query, pipeline, schema, viz
 
@@ -46,6 +52,11 @@ class QueryRequest(BaseModel):
     entity_id: str | None = None
     raw_text_profile: dict | None = None
     top_k: int = config.DEFAULT_TOP_K
+
+
+class ThesisTopicRequest(BaseModel):
+    source_id: str
+    opportunity: dict
 
 
 # Cached the same way saberlink.pipeline caches its own module-level state:
@@ -101,6 +112,21 @@ def query(body: QueryRequest) -> dict:
     source_label = (body.raw_text_profile or {}).get("title")
     out["graph"] = _build_graph_payload(out["source"]["id"], out["results"], source_label=source_label)
     return out
+
+
+@app.post("/opportunities/thesis-topic")
+def thesis_topic(body: ThesisTopicRequest) -> dict:
+    """[PLUS] Rephrases an already-computed THESIS_OPPORTUNITY (from
+    saberlink.opportunities, returned inline by /query) into a natural
+    thesis-topic title via Bedrock. Never re-derives the connection itself —
+    see saberlink/plus/thesis_topic.py's module docstring. Only works for a
+    persisted entity_id (the ephemeral TEMP-xxxxxxxx source from texto libre
+    /PDF isn't in the cached entity lookup, same constraint /graph
+    documents) — falls back to the template title in that case, same as any
+    other Bedrock failure mode."""
+    from saberlink.plus.thesis_topic import generate_thesis_topic
+
+    return generate_thesis_topic(body.source_id, body.opportunity, _entity_lookup())
 
 
 def _parse_and_query_pdf(tmp_path: Path, top_k: int) -> dict:

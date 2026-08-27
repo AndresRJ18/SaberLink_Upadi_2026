@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { apiErrorMessage, generateThesisTopic } from "../api/client";
 import ScoreBreakdown from "./ScoreBreakdown";
 
 const PRIORITY_COLORS = { alta: "#8fbf7a", media: "#cc9f45", baja: "#7d8798" };
@@ -18,8 +20,30 @@ function SectionLabel({ children, tag }) {
   );
 }
 
-function OpportunityCard({ o }) {
+function OpportunityCard({ o, sourceId }) {
   const color = PRIORITY_COLORS[o.priority] || "#7d8798";
+  const [aiTitle, setAiTitle] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const isThesis = o.type === "THESIS_OPPORTUNITY";
+
+  async function handleGenerate() {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await generateThesisTopic({ sourceId, opportunity: o });
+      if (result.generated_by_ai) {
+        setAiTitle(result);
+      } else {
+        setError("Bedrock no respondió — se mantiene el texto original.");
+      }
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="rounded-lg border border-ink-600 bg-ink-950/50 p-3">
       <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -33,8 +57,34 @@ function OpportunityCard({ o }) {
           prioridad {o.priority}
         </span>
       </div>
-      <p className="font-body text-[15px] text-parchment-200/90">{o.opportunity}</p>
+
+      {aiTitle ? (
+        <>
+          <div className="mb-1 flex items-center gap-2">
+            <span className="rounded border border-copper-500/40 bg-copper-500/10 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-copper-400">
+              generado por IA · {aiTitle.model}
+            </span>
+          </div>
+          <p className="font-body text-[15px] font-medium text-parchment-200">{aiTitle.title}</p>
+          <p className="mt-1 font-body text-xs italic text-parchment-200/40">
+            basado en: {o.opportunity}
+          </p>
+        </>
+      ) : (
+        <p className="font-body text-[15px] text-parchment-200/90">{o.opportunity}</p>
+      )}
       <p className="mt-1 font-body text-xs italic text-parchment-200/40">razón: {o.reason}</p>
+
+      {isThesis && !aiTitle && (
+        <button
+          onClick={handleGenerate}
+          disabled={loading}
+          className="mt-2.5 rounded-full border border-copper-500/40 px-2.5 py-1 font-mono text-[11px] font-semibold text-copper-400 transition hover:bg-copper-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Generando…" : "✨ Generar tema con IA"}
+        </button>
+      )}
+      {error && <p className="mt-1.5 font-body text-xs italic text-copper-500/70">{error}</p>}
     </div>
   );
 }
@@ -173,7 +223,7 @@ export default function NodeDetailDrawer({ selectedNodeId, queryResult, graphDat
                 <SectionLabel>Oportunidades relacionadas</SectionLabel>
                 <div className="flex flex-col gap-3">
                   {relatedOpportunities.map((o, i) => (
-                    <OpportunityCard key={i} o={o} />
+                    <OpportunityCard key={i} o={o} sourceId={queryResult?.source?.id} />
                   ))}
                 </div>
               </div>

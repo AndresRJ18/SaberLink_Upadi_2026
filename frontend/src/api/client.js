@@ -37,6 +37,14 @@ export async function searchEntities({ type, q, limit = 8 } = {}) {
   return data;
 }
 
+export async function generateThesisTopic({ sourceId, opportunity }) {
+  const { data } = await client.post("/opportunities/thesis-topic", {
+    source_id: sourceId,
+    opportunity,
+  });
+  return data;
+}
+
 export async function fetchLegend() {
   const { data } = await client.get("/meta/legend");
   return data;
