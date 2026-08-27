@@ -128,24 +128,34 @@ const STYLESHEET = [
   },
 ];
 
+// A fresh layout object (new reference) is what tells react-cytoscapejs's
+// own diff (patch.js: shallowObjDiff on the `layout` prop) to call
+// cy.layout(...).run() again — recomputed only when the actual graph data
+// changes, via the [elements] dependency, never on unrelated re-renders
+// (e.g. toggling a band filter chip).
+function useDiscoveryLayout(elements) {
+  return useMemo(() => {
+    if (elements.length === 0) return { name: "preset" };
+    return {
+      name: "fcose",
+      animate: true,
+      animationDuration: 400,
+      randomize: true,
+      fit: true,
+      padding: 48,
+      nodeDimensionsIncludeLabels: true,
+      nodeRepulsion: 9000,
+      idealEdgeLength: 110,
+      quality: "default",
+    };
+  }, [elements]);
+}
+
 export default function DiscoveryGraph({ graphData, legend }) {
   const cyRef = useRef(null);
   const [activeBands, setActiveBands] = useState(new Set(BANDS));
   const elements = useMemo(() => toElements(graphData), [graphData]);
-
-  useEffect(() => {
-    const cy = cyRef.current;
-    if (!cy || elements.length === 0) return;
-    const layout = cy.layout({
-      name: "fcose",
-      animate: true,
-      animationDuration: 400,
-      nodeRepulsion: 6000,
-      idealEdgeLength: 90,
-      quality: "proof",
-    });
-    layout.run();
-  }, [elements]);
+  const layout = useDiscoveryLayout(elements);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -167,6 +177,15 @@ export default function DiscoveryGraph({ graphData, legend }) {
 
   function handleCyInit(cy) {
     cyRef.current = cy;
+    // react-cytoscapejs calls this `cy` prop on every mount AND every
+    // update (see its componentDidMount/componentDidUpdate) — and, under
+    // React.StrictMode in dev, the whole component mounts, unmounts, and
+    // remounts once on its first appearance. Without this guard, tap
+    // handlers would stack up (once per update) on whichever cy instance
+    // survives. The guard is per-instance (cy.scratch), so a genuinely new
+    // cy instance (after a StrictMode remount) still gets wired up once.
+    if (cy.scratch("_saberlinkBound")) return;
+    cy.scratch("_saberlinkBound", true);
     cy.on("tap", "node", (evt) => {
       const node = evt.target;
       const neighborhood = node.closedNeighborhood();
@@ -182,7 +201,7 @@ export default function DiscoveryGraph({ graphData, legend }) {
 
   if (!graphData) {
     return (
-      <div className="flex h-[520px] items-center justify-center rounded-xl border border-dashed border-slate-800 text-sm text-slate-500">
+      <div className="flex h-[560px] items-center justify-center rounded-xl border border-dashed border-slate-800 text-sm text-slate-500">
         El grafo de descubrimiento aparece acá después de una búsqueda.
       </div>
     );
@@ -221,7 +240,8 @@ export default function DiscoveryGraph({ graphData, legend }) {
       <CytoscapeComponent
         elements={elements}
         stylesheet={STYLESHEET}
-        style={{ width: "100%", height: "480px" }}
+        layout={layout}
+        style={{ width: "100%", height: "560px" }}
         cy={handleCyInit}
         wheelSensitivity={0.2}
       />
