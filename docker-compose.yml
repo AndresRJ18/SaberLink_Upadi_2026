@@ -1,8 +1,13 @@
 services:
   backend:
     build: ./backend
-    ports:
-      - "8000:8000"
+    # No `ports:` — under Dokploy, Traefik already owns 80/443 on the host
+    # and reaches containers over Docker's internal network using the
+    # "Container Port" set in the service's Domains tab, not a published
+    # host port. Publishing 8000 here would conflict the same way 80 did
+    # for frontend. `expose` is documentation only, doesn't publish anything.
+    expose:
+      - "8000"
     volumes:
       # Persists ingest/embeddings/graph across container restarts — the
       # whole point of a real VPS over an ephemeral-disk PaaS.
@@ -26,8 +31,8 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
       - backend
     restart: unless-stopped

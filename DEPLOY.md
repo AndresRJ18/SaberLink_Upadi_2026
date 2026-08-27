@@ -121,7 +121,12 @@ Y volver a **Deploy** desde Dokploy.
   pudiendo correr todo local con `uvicorn` + `npm run dev` (ver el README
   principal). Esto es un link público adicional.
 - Si en algún momento preferís saltarte Dokploy y correr `docker compose up`
-  directo por SSH (sin pasar por su UI), el `docker-compose.yml` y
-  `.env.example` del repo ya sirven para eso tal cual — solo que ahí
-  `SABERLINK_DATA_DIR` sería `./data/raw` (el default) en vez de
+  directo por SSH (sin pasar por su UI): `docker-compose.yml` no publica
+  puertos al host (Dokploy los rutea vía Traefik, sin eso `frontend`/`backend`
+  no serían alcanzables desde afuera de otra forma) — usá
+  `docker-compose.local.yml` encima para recuperarlos:
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+  ```
+  y ahí `SABERLINK_DATA_DIR` sería `./data/raw` (el default) en vez de
   `../files/data_raw`.
