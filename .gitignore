@@ -27,3 +27,6 @@ frontend/.env
 Thumbs.db
 .vscode/
 .idea/
+
+# Local Claude Code session state — not project content
+.claude/

@@ -14,10 +14,13 @@ Run with (from backend/):
 
 from __future__ import annotations
 
+import asyncio
+import tempfile
 from functools import lru_cache
+from pathlib import Path
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -75,6 +78,37 @@ def query(body: QueryRequest) -> dict:
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def _parse_and_query_pdf(tmp_path: Path, top_k: int) -> dict:
+    """Runs on a worker thread (see asyncio.to_thread below) — both Docling
+    parsing and pipeline.run_query are synchronous/CPU-bound; calling them
+    directly from the async route would block uvicorn's single event loop
+    for the whole duration (minutes, on Docling's first model download),
+    freezing every other in-flight request."""
+    from saberlink.plus.docling_intake import pdf_to_temp_need
+
+    profile = pdf_to_temp_need(tmp_path)
+    return pipeline.run_query(raw_text_profile=profile, top_k=top_k)
+
+
+@app.post("/query/pdf")
+async def query_pdf(file: UploadFile = File(...), top_k: int = config.DEFAULT_TOP_K) -> dict:
+    """[PLUS] Same ephemeral-NEED mechanism as the free-text query mode —
+    the PDF is parsed via Docling into a raw_text_profile, run through the
+    exact same pipeline.run_query(), and never persisted."""
+    if file.content_type not in ("application/pdf", "application/octet-stream") and not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Se espera un archivo PDF")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / file.filename
+        tmp_path.write_bytes(await file.read())
+        try:
+            return await asyncio.to_thread(_parse_and_query_pdf, tmp_path, top_k)
+        except ImportError as exc:
+            raise HTTPException(status_code=503, detail="Docling no está instalado en el servidor") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"No se pudo procesar el PDF: {exc}") from exc
 
 
 @app.get("/graph")
