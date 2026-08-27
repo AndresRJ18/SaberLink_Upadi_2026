@@ -11,6 +11,10 @@ Two views:
   each connection is structurally close. Small and legible (source + top_k
   + a handful of hubs) — this is "the subgraph OF THE QUERY" the original
   architecture note asked for, not a dump of the raw institutional graph.
+  The actual node/edge selection is computed once, in
+  saberlink.graph_query.build_discovery_graph_data — shared with the API's
+  /graph endpoint (backend/api/main.py) so the two never compute it twice;
+  this module only translates that data into a pyvis Network.
 - export_ego_graph: the unfiltered radius-N neighborhood in graph.gpickle.
   Useful to audit the graph itself, but easily 100+ nodes and hard to read —
   kept as a secondary, explicitly-requested view, not the default.
@@ -23,23 +27,16 @@ from pathlib import Path
 import networkx as nx
 import pandas as pd
 
-from saberlink import config, graph_build, graph_query, pipeline
+from saberlink import config, entity_lookup as entity_lookup_mod, graph_build, graph_query, pipeline, viz
 
-ENTITY_TYPE_COLORS: dict[str, str] = {
-    "FAC": "#6b7280", "PRG": "#9ca3af", "GRP": "#2563eb", "LIN": "#60a5fa",
-    "CAP": "#0891b2", "SRC": "#94a3b8", "INV": "#16a34a", "EXP": "#4ade80",
-    "SUB": "#a855f7", "COM": "#c084fc", "LO": "#d8b4fe",
-    "NEED": "#dc2626", "PRJ": "#ea580c", "THS": "#f59e0b", "PUB": "#eab308",
-}
-ENTITY_TYPE_LABELS: dict[str, str] = {
-    "FAC": "Facultad", "PRG": "Programa", "GRP": "Grupo de investigación",
-    "LIN": "Línea de investigación", "CAP": "Capacidad institucional",
-    "SRC": "Fuente (metadata)", "INV": "Investigador", "EXP": "Expertise",
-    "SUB": "Asignatura", "COM": "Competencia", "LO": "Resultado de aprendizaje",
-    "NEED": "Necesidad", "PRJ": "Proyecto", "THS": "Tesis", "PUB": "Publicación",
-}
-DEFAULT_COLOR = "#d1d5db"
-SCORE_BAND_COLORS = {"alta": "#16a34a", "media": "#f59e0b", "baja": "#9ca3af"}
+ENTITY_TYPE_COLORS = viz.ENTITY_TYPE_COLORS
+ENTITY_TYPE_LABELS = viz.ENTITY_TYPE_LABELS
+DEFAULT_COLOR = viz.DEFAULT_COLOR
+SCORE_BAND_COLORS = viz.SCORE_BAND_COLORS
+
+# Pyvis-specific rendering knobs per node role — not a graph_query concern.
+ROLE_SIZE = {"source": 42, "hub": 12, "result": 26}
+ROLE_FONT_SIZE = {"source": 16, "hub": 10, "result": 13}
 
 
 def _node_label(entity_id: str, entities: pd.DataFrame) -> str:
@@ -120,63 +117,44 @@ def export_discovery_graph(
 
     out = pipeline.run_query(entity_id=entity_id, raw_text_profile=raw_text_profile, top_k=top_k)
     source_id = out["source"]["id"]
-    entity_id = entity_id or source_id
     entities = pd.read_parquet(config.ENTITIES_PARQUET)
+    lookup = entity_lookup_mod.build(entities)
     graph = graph_build.load_graph()
     pre = graph_query.precompute_source(graph, source_id)
+    source_label = (raw_text_profile or {}).get("title")
+
+    graph_data = graph_query.build_discovery_graph_data(
+        source_id, out["results"], graph, pre, lookup, source_label=source_label
+    )
 
     net = Network(height="800px", width="100%", directed=True, notebook=False, cdn_resources="in_line")
     net.barnes_hut(spring_length=220, spring_strength=0.015, damping=0.2)
 
-    added: set[str] = set()
     used_types: set[str] = set()
-    source_label = (raw_text_profile or {}).get("title") or entity_id
-
-    def add_node(node_id: str, *, is_source: bool = False, is_hub: bool = False) -> None:
-        if node_id in added:
-            return
-        added.add(node_id)
-        etype = "NEED" if (is_source and node_id.startswith("TEMP-")) else _entity_type(node_id, entities)
-        used_types.add(etype)
-        label = f"{node_id}\n{source_label[:40]}" if (is_source and node_id.startswith("TEMP-")) else _node_label(node_id, entities)
-        color = ENTITY_TYPE_COLORS.get(etype, DEFAULT_COLOR)
-        size = 42 if is_source else (12 if is_hub else 26)
+    for node in graph_data["nodes"]:
+        used_types.add(node["type"])
+        is_source = node["role"] == "source"
+        label = f"{node['id']}\n{node['label']}" if node["label"] != node["id"] else node["id"]
         net.add_node(
-            node_id, label=label, title=f"{node_id} ({ENTITY_TYPE_LABELS.get(etype, etype)})",
-            color=color, size=size, borderWidth=3 if is_source else 1,
-            font={"size": 16 if is_source else (10 if is_hub else 13)},
+            node["id"], label=label, title=f"{node['id']} ({node['type_label']})",
+            color=node["color"], size=ROLE_SIZE[node["role"]], borderWidth=3 if is_source else 1,
+            font={"size": ROLE_FONT_SIZE[node["role"]]},
         )
 
-    add_node(source_id, is_source=True)
-
-    for r in out["results"]:
-        target_id = r["target"]["id"]
-        score = r["relevance"]["score"]
-        band = r["relevance"]["label"]
-        add_node(target_id)
-
-        tooltip = r["explanation"].replace("\n", "<br>")
-        net.add_edge(
-            source_id, target_id,
-            value=1 + score * 5,
-            color=SCORE_BAND_COLORS.get(band, "#9ca3af"),
-            title=f"score={score:.2f} ({band})<br>{tooltip}",
-            label=f"{score:.2f}",
-            font={"size": 11, "align": "top"},
-        )
-
-        path = pre.paths.get(target_id)
-        if path and len(path) > 2:
-            for hub in path[1:-1]:
-                add_node(hub, is_hub=True)
-            for a, b in zip(path[:-1], path[1:]):
-                edge_data = graph.get_edge_data(a, b) or {}
-                relation = edge_data.get("relation_type", "")
-                is_inferred = edge_data.get("edge_kind") == "inferred"
-                net.add_edge(
-                    a, b, color="#94a3b8", width=1, dashes=is_inferred,
-                    title=relation, arrows="",
-                )
+    for edge in graph_data["edges"]:
+        if edge["kind"] == "discovery":
+            tooltip = edge["tooltip"].replace("\n", "<br>")
+            net.add_edge(
+                edge["source"], edge["target"],
+                value=1 + edge["score"] * 5, color=edge["color"],
+                title=f"score={edge['score']:.2f} ({edge['band']})<br>{tooltip}",
+                label=edge["label"], font={"size": 11, "align": "top"},
+            )
+        else:
+            net.add_edge(
+                edge["source"], edge["target"], color="#94a3b8", width=1,
+                dashes=edge["inferred"], title=edge["relation"], arrows="",
+            )
 
     out_dir = out_dir or (config.PROCESSED_DIR / "subgraphs")
     out_dir.mkdir(parents=True, exist_ok=True)

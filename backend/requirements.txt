@@ -12,3 +12,8 @@ pytest==8.3.3
 docling==2.123.0
 pyvis==0.3.2
 streamlit==1.62.0
+
+# API — expone saberlink.pipeline vía HTTP para el frontend (frontend/)
+fastapi==0.141.1
+uvicorn==0.30.6
+pydantic==2.13.4
