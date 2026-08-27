@@ -157,8 +157,9 @@ export default function App() {
         </div>
 
         <footer className="mt-10 border-t border-gold-500/10 pt-4 font-body text-xs italic text-parchment-200/35">
-          Sin LLM en el pipeline — embeddings (sentence-transformers), grafo (networkx) y
-          scoring/oportunidades en Python propio. Sin cloud deploy, corre local.
+          Descubrimiento, scoring y oportunidades: embeddings (sentence-transformers), grafo
+          (networkx) y reglas en Python propio — sin LLM. IA generativa (AWS Bedrock, Nova 2
+          Lite) solo redacta, bajo pedido, el título de una oportunidad ya calculada.
         </footer>
       </main>
 

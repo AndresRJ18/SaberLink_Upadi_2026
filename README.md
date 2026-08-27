@@ -215,5 +215,18 @@ python -m pytest -q
   layout/OCR de Docling (`docling-project/docling-layout-heron`, RapidOCR
   vía ONNX Runtime) — usados únicamente para extraer texto de un PDF subido
   por el usuario, nunca para inferir relaciones institucionales.
-- Sin APIs externas, sin servicios cloud, sin LLM en ningún punto del pipeline.
+- **IA generativa (PLUS, opcional): AWS Bedrock, `Amazon Nova 2 Lite`**
+  (`backend/saberlink/plus/thesis_topic.py`), usada **exclusivamente** para
+  redactar el título de una oportunidad de tipo `THESIS_OPPORTUNITY` ya
+  calculada — nunca decide qué está conectado con qué, nunca calcula un
+  score, nunca corre en el descubrimiento/scoring/ranking del núcleo. Recibe
+  solo texto ya verificado (campos de la necesidad y de la tesis relacionada)
+  y no se activa salvo que el usuario lo pida explícitamente en la interfaz.
+  Si falla o no está configurado, cae automáticamente al texto de plantilla
+  existente. En la respuesta y en la UI queda marcado `generated_by_ai: true`
+  / etiqueta "generado por IA", distinto de `generated_text: true` (que es
+  texto de plantilla, no generativo) — para que evidencia institucional y
+  contenido generado nunca se confundan.
+- Fuera de eso: sin APIs externas, sin servicios cloud, sin LLM en el
+  descubrimiento, scoring, evidencia u oportunidades del núcleo.
 - Sin datasets complementarios — todo el conocimiento viene de Data V1.0.
