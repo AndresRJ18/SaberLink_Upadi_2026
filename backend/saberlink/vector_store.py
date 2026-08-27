@@ -14,6 +14,8 @@ second, potentially stale copy.
 
 from __future__ import annotations
 
+import threading
+
 import pandas as pd
 
 from saberlink import config, embeddings
@@ -21,6 +23,8 @@ from saberlink import config, embeddings
 
 _client = None
 _collection = None
+_client_lock = threading.Lock()
+_collection_lock = threading.Lock()
 
 
 def get_client():
@@ -28,15 +32,26 @@ def get_client():
     # first client creation, which added tens of seconds to the very first
     # query of a process when the network call was slow/unreachable —
     # unacceptable for a live demo's first query.
+    #
+    # Double-checked locking: FastAPI runs sync route handlers in a thread
+    # pool, so two requests can race into this function concurrently on a
+    # fresh process. Without the lock, two threads both see _client as None
+    # and both call chromadb.PersistentClient(path=...) for the same path —
+    # chromadb's own SharedSystemClient caches "systems" by path identifier
+    # and isn't safe against that race, raising a bare KeyError deep inside
+    # chromadb instead of a clear error (observed in practice, not just
+    # theoretical).
     global _client
     if _client is None:
-        import chromadb
-        from chromadb.config import Settings
+        with _client_lock:
+            if _client is None:
+                import chromadb
+                from chromadb.config import Settings
 
-        config.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-        _client = chromadb.PersistentClient(
-            path=str(config.CHROMA_DIR), settings=Settings(anonymized_telemetry=False)
-        )
+                config.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+                _client = chromadb.PersistentClient(
+                    path=str(config.CHROMA_DIR), settings=Settings(anonymized_telemetry=False)
+                )
     return _client
 
 
@@ -44,16 +59,19 @@ def get_collection(client=None):
     # Module-level cache: opening a PersistentClient/collection touches disk
     # (sqlite + HNSW index load) and dominates latency if repeated per
     # field-pair query — a live run_query() call does many of these, so this
-    # cache is what keeps a full query in the sub-2s budget.
+    # cache is what keeps a full query in the sub-2s budget. Same
+    # double-checked-locking reasoning as get_client() above.
     global _collection
     if client is not None:
         return client.get_or_create_collection(
             name=config.CHROMA_COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
         )
     if _collection is None:
-        _collection = get_client().get_or_create_collection(
-            name=config.CHROMA_COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
-        )
+        with _collection_lock:
+            if _collection is None:
+                _collection = get_client().get_or_create_collection(
+                    name=config.CHROMA_COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
+                )
     return _collection
 
 

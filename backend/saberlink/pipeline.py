@@ -13,6 +13,7 @@ particular query — this is the same distinction the official rules draw
 
 from __future__ import annotations
 
+import threading
 import time
 import uuid
 
@@ -26,6 +27,7 @@ _graph = None
 _vocab: set[str] | None = None
 _term_weights: dict[str, float] | None = None
 _entity_lookup: dict[str, dict] | None = None
+_state_lock = threading.Lock()
 
 CANDIDATE_TYPES_BY_SOURCE: dict[str, list[str]] = {
     "NEED": ["PRJ", "THS", "INV", "CAP", "GRP", "SUB", "COM", "LO"],
@@ -38,24 +40,33 @@ DEFAULT_CANDIDATE_TYPES = ["PRJ", "THS", "INV", "GRP", "CAP"]
 
 
 def _load_state():
+    # Double-checked locking: FastAPI runs sync route handlers in a thread
+    # pool, so the very first two requests on a fresh process can call this
+    # concurrently. Without the lock, two threads both see e.g. _vocab as
+    # None and both do the (non-idempotent-under-concurrency) first-time
+    # setup below at once — observed in practice to crash with a bare
+    # KeyError deep inside chromadb's client-caching, not just redundant work.
     global _entities, _fields_index, _graph, _vocab, _term_weights, _entity_lookup
-    if _entities is None:
-        _entities = pd.read_parquet(config.ENTITIES_PARQUET)
-    if _fields_index is None:
-        _fields_index = pd.read_parquet(config.FIELDS_INDEX_PARQUET)
-    if _graph is None:
-        _graph = graph_build.load_graph()
-    if _vocab is None:
-        _vocab = dv.load_vocab()
-    if _term_weights is None:
-        _term_weights = dv.load_term_weights()
-    if _entity_lookup is None:
-        # Built once and reused for every query — rebuilding this dict from
-        # the (pyarrow-backed) DataFrame on every call was the single
-        # largest remaining cost of a live query, since the official
-        # entities never change between calls (only the PLUS PDF-upload
-        # flow adds one ephemeral row, handled separately below).
-        _entity_lookup = entity_lookup.build(_entities)
+    if _entities is None or _fields_index is None or _graph is None or _vocab is None or _term_weights is None or _entity_lookup is None:
+        with _state_lock:
+            if _entities is None:
+                _entities = pd.read_parquet(config.ENTITIES_PARQUET)
+            if _fields_index is None:
+                _fields_index = pd.read_parquet(config.FIELDS_INDEX_PARQUET)
+            if _graph is None:
+                _graph = graph_build.load_graph()
+            if _vocab is None:
+                _vocab = dv.load_vocab()
+            if _term_weights is None:
+                _term_weights = dv.load_term_weights()
+            if _entity_lookup is None:
+                # Built once and reused for every query — rebuilding this dict
+                # from the (pyarrow-backed) DataFrame on every call was the
+                # single largest remaining cost of a live query, since the
+                # official entities never change between calls (only the
+                # PLUS PDF-upload flow adds one ephemeral row, handled
+                # separately below).
+                _entity_lookup = entity_lookup.build(_entities)
     return _entities, _fields_index, _graph, _vocab, _term_weights, _entity_lookup
 
 

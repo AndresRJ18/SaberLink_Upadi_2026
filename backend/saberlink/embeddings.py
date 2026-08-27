@@ -4,19 +4,29 @@ text."""
 
 from __future__ import annotations
 
+import threading
+
 import numpy as np
 
 from saberlink import config
 
 _model = None
+_model_lock = threading.Lock()
 
 
 def get_model():
+    # Double-checked locking: FastAPI runs sync route handlers in a thread
+    # pool, so two requests can call get_model() concurrently on a fresh
+    # process. Without the lock, both see _model as None and both construct
+    # a SentenceTransformer — wasteful at best; observed in practice to also
+    # race the same way as vector_store.get_client() below.
     global _model
     if _model is None:
-        from sentence_transformers import SentenceTransformer
+        with _model_lock:
+            if _model is None:
+                from sentence_transformers import SentenceTransformer
 
-        _model = SentenceTransformer(config.EMBEDDING_MODEL_NAME)
+                _model = SentenceTransformer(config.EMBEDDING_MODEL_NAME)
     return _model
 
 
