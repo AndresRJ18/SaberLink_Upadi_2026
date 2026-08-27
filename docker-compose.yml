@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persists ingest/embeddings/graph across container restarts — the
+      # whole point of a real VPS over an ephemeral-disk PaaS.
+      - backend_processed:/app/processed
+      # The dataset itself never lives in the image or the git repo — copy
+      # it onto the VPS once (e.g. scp -r data/raw/ vps:/opt/saberlink-data)
+      # and point this at wherever you put it.
+      - ${SABERLINK_DATA_DIR:-./data/raw}:/app/data_raw:ro
+    environment:
+      SABERLINK_DATA_ROOT: /app/data_raw
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend_processed:

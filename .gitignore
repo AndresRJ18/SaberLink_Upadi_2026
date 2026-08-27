@@ -22,6 +22,9 @@ frontend/dist/
 frontend/.vite/
 frontend/.env
 
+# Deploy config with real domains/origins — see .env.example
+.env
+
 # OS / editor
 .DS_Store
 Thumbs.db

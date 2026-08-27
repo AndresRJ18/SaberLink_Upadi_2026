@@ -15,6 +15,7 @@ Run with (from backend/):
 from __future__ import annotations
 
 import asyncio
+import os
 import tempfile
 from functools import lru_cache
 from pathlib import Path
@@ -28,9 +29,14 @@ from saberlink import config, entity_lookup as entity_lookup_mod, graph_build, g
 
 app = FastAPI(title="SaberLink API", version="0.1.0")
 
+# Local dev origins always allowed; CORS_ORIGINS adds the deployed frontend's
+# real origin(s) (comma-separated) without touching code — set in the VPS's
+# .env, read by docker-compose's env_file for the backend service.
+_default_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+_extra_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_default_origins + _extra_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = PACKAGE_ROOT.parent
 
 # Original Data V1.0 — read-only, never written to. Lives at <repo_root>/data/raw
-# (gitignored by default — see data/README.md for how to place it there).
-DATA_ROOT = PROJECT_ROOT.parent / "data" / "raw"
+# locally (gitignored by default — see data/README.md). In a container the repo's
+# data/ sibling folder doesn't exist inside the image, so SABERLINK_DATA_ROOT lets
+# a docker-compose volume mount point somewhere else without touching this file.
+_data_root_override = os.environ.get("SABERLINK_DATA_ROOT")
+DATA_ROOT = Path(_data_root_override) if _data_root_override else (PROJECT_ROOT.parent / "data" / "raw")
 INSTITUTION_DIR = DATA_ROOT / "01_institution"
 PEOPLE_DIR = DATA_ROOT / "02_people_curriculum"
 NEEDS_DIR = DATA_ROOT / "03_knowledge_needs"
