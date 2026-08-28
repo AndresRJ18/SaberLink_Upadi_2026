@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiErrorMessage, fetchLegend, queryPdf, runQuery } from "./api/client";
+import { apiErrorMessage, fetchLegend, queryPdfEnhanced, runQuery } from "./api/client";
 import CompactRail from "./components/CompactRail";
 import NodeDetailDrawer from "./components/NodeDetailDrawer";
 import SearchPanel from "./components/SearchPanel";
@@ -30,7 +30,7 @@ export default function App() {
     fetchLegend().then(setLegend).catch(() => setLegend(null));
   }, []);
 
-  async function handleSearch({ entityId, rawTextProfile, pdfFile, topK }) {
+  async function handleSearch({ entityId, rawTextProfile, pdfFile, topK, useCohere }) {
     setLoading(true);
     setError(null);
     setGraphData(null);
@@ -39,7 +39,7 @@ export default function App() {
       // builds it from the very same run_query() call, so it works for an
       // ephemeral texto-libre/PDF source too — no second lookup by id).
       const result = pdfFile
-        ? await queryPdf({ file: pdfFile, topK })
+        ? await queryPdfEnhanced({ file: pdfFile, topK, useCohere })
         : await runQuery({ entityId, rawTextProfile, topK });
       setQueryResult(result);
       setGraphData(result.graph || null);

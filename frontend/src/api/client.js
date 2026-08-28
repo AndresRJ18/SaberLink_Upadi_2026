@@ -23,6 +23,16 @@ export async function queryPdf({ file, topK }) {
   return data;
 }
 
+export async function queryPdfEnhanced({ file, topK, useCohere = true }) {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await client.post("/query/pdf/enhanced", form, {
+    params: { top_k: topK, use_cohere: useCohere },
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
 export async function fetchGraph({ entityId, topK }) {
   const { data } = await client.get("/graph", {
     params: { entity_id: entityId, top_k: topK },

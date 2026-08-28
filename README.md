@@ -32,10 +32,13 @@ saberlink/
 | Frontend | React + Vite + Tailwind + Cytoscape.js |
 | Interfaz alternativa [PLUS] | Streamlit + pyvis, Jupyter Notebook |
 | PDF de usuario [PLUS] | Docling |
+| PDF mejorado [PLUS] | LightRAG + Cohere (búsqueda híbrida + re-ranking) |
 
-No se usa ningún LLM en ningún punto del pipeline — la explicación en texto es
-100% generada por templates de string sobre el breakdown ya calculado, nunca
-por un modelo generativo. Sin cloud deploy — corre local.
+El núcleo no usa LLMs — la explicación en texto es 100% generada por templates
+de string sobre el breakdown ya calculado. Sin cloud deploy — corre local.
+
+La integración con LightRAG + Cohere es opcional ([PLUS]) y solo se activa para
+PDFs subidos por usuario, manteniendo el núcleo sin dependencias externas.
 
 ## Instalación
 
@@ -163,6 +166,43 @@ print(out["source"])  # {"id": "TEMP-xxxxxxxx", "type": "NEED", "official": Fals
 
 El perfil extraído nunca se escribe en `institutional_needs.csv` ni en
 `entities.parquet` — vive solo en memoria durante esa llamada.
+
+**PDF mejorado con LightRAG + Cohere (búsqueda híbrida)**
+
+```python
+from saberlink import pipeline
+
+# Requiere COHERE_API_KEY environment variable
+out = pipeline.run_hybrid_query("ruta/al/documento.pdf", use_cohere=True, top_k=5)
+print(out["meta"])  # {"cohere_used": true, "institutional_results": X, "pdf_results": Y}
+```
+
+Este modo combina:
+- Búsqueda en conocimiento institucional (sentence-transformers + ChromaDB)
+- Búsqueda en grafo del PDF (LightRAG)
+- Re-ranking con Cohere API
+- Generación de oportunidades mejoradas con LLM
+
+Para usar esta funcionalidad, instala las dependencias adicionales:
+```powershell
+pip install lightrag cohere pymupdf4llm
+export COHERE_API_KEY="tu-api-key"  # o en .env
+```
+
+**Uso via API:**
+
+```powershell
+# PDF estándar (Docling)
+POST /query/pdf
+Content-Type: multipart/form-data
+file: <archivo.pdf>
+
+# PDF mejorado (LightRAG + Cohere)
+POST /query/pdf/enhanced
+Content-Type: multipart/form-data
+file: <archivo.pdf>
+use_cohere: true
+```
 
 **Subgrafo interactivo (pyvis, respaldo offline)**
 

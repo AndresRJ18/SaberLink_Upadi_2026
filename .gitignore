@@ -3,6 +3,9 @@
 #  python -m saberlink.vector_store && python -m saberlink.graph_build`
 backend/processed/
 
+# LightRAG storage [PLUS] — regenerable from uploaded PDFs
+backend/knowledge_graph/
+
 # Raw dataset — synthetic hackathon data, not redistributed by default.
 # See data/README.md for how to place it locally.
 data/raw/

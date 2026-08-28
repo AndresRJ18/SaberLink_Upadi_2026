@@ -167,6 +167,79 @@ def run_query(
     }
 
 
+def run_hybrid_query(
+    pdf_path: str,
+    use_cohere: bool = True,
+    cohere_api_key: str | None = None,
+    top_k: int = config.DEFAULT_TOP_K,
+) -> dict:
+    """Run hybrid query combining institutional and LightRAG search [PLUS].
+
+    This is a wrapper around saberlink.lightrag_integration.hybrid_search
+    for convenience. The actual implementation is in the lightrag_integration
+    module to maintain the isolation principle (core doesn't depend on PLUS).
+
+    Args:
+        pdf_path: Path to PDF file
+        use_cohere: Whether to use Cohere for enhancement
+        cohere_api_key: Cohere API key (default: from config)
+        top_k: Number of top results to return
+
+    Returns:
+        Combined results with enhanced opportunities
+    """
+    try:
+        from saberlink.lightrag_integration import hybrid_search
+    except ImportError:
+        raise ImportError(
+            "LightRAG integration not available. Install dependencies: "
+            "pip install lightrag cohere pymupdf4llm"
+        )
+
+    return hybrid_search.run_hybrid_query(
+        pdf_path=pdf_path,
+        use_cohere=use_cohere,
+        cohere_api_key=cohere_api_key,
+        top_k=top_k,
+    )
+
+
+async def run_hybrid_query_async(
+    pdf_path: str,
+    use_cohere: bool = True,
+    cohere_api_key: str | None = None,
+    top_k: int = config.DEFAULT_TOP_K,
+) -> dict:
+    """Async version of run_hybrid_query for FastAPI endpoints [PLUS].
+
+    This version avoids the pickle error when running asyncio code inside
+    thread pool executors by being fully async.
+
+    Args:
+        pdf_path: Path to PDF file
+        use_cohere: Whether to use Cohere for enhancement
+        cohere_api_key: Cohere API key (default: from config)
+        top_k: Number of top results to return
+
+    Returns:
+        Combined results with enhanced opportunities
+    """
+    try:
+        from saberlink.lightrag_integration import hybrid_search
+    except ImportError:
+        raise ImportError(
+            "LightRAG integration not available. Install dependencies: "
+            "pip install lightrag cohere pymupdf4llm"
+        )
+
+    return await hybrid_search.run_hybrid_query_async(
+        pdf_path=pdf_path,
+        use_cohere=use_cohere,
+        cohere_api_key=cohere_api_key,
+        top_k=top_k,
+    )
+
+
 if __name__ == "__main__":
     import json
     import sys

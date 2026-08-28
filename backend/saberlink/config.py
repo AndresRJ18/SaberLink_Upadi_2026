@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = PACKAGE_ROOT.parent
@@ -51,3 +56,14 @@ LABEL_BANDS = [
 ]
 
 DEFAULT_TOP_K = 8
+
+# LightRAG integration [PLUS]
+LIGHTRAG_DIR = PROJECT_ROOT / "knowledge_graph" / "lightrag_storage"
+LIGHTRAG_GRAPH_FILE = LIGHTRAG_DIR / "graph.ml"
+LIGHTRAG_EMBEDDINGS_FILE = LIGHTRAG_DIR / "embeddings.kv"
+
+# Cohere API [PLUS] - set via environment variable COHERE_API_KEY
+# Note: Cohere API key should start with "cohere_" prefix
+COHERE_API_KEY = os.getenv("COHERE_API_KEY", "cohere_vjtwdYUlAkffQ4rvqDUO2pTGEzLVkfZrZyaXf6Zn4LaBJj")
+COHERE_MODEL = "command-r-plus-08-2024"  # Updated model name
+COHERE_EMBEDDING_MODEL = "embed-multilingual-v3.0"

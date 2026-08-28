@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { searchEntities } from "../api/client";
+import { searchEntities, queryPdfEnhanced } from "../api/client";
 
 const ENTITY_TYPE_HINT = "Ej: NEED-001, PRJ-014, INV-032, GRP-009";
 
@@ -25,6 +25,7 @@ export default function SearchPanel({ onSubmit, loading }) {
   const [expectedImpact, setExpectedImpact] = useState("");
   const [pdfFile, setPdfFile] = useState(null);
   const [topK, setTopK] = useState(8);
+  const [useCohere, setUseCohere] = useState(true);
   const debounceRef = useRef(null);
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function SearchPanel({ onSubmit, loading }) {
     return () => clearTimeout(debounceRef.current);
   }, [entityId, mode]);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setShowSuggestions(false);
     if (mode === "id") {
@@ -63,7 +64,7 @@ export default function SearchPanel({ onSubmit, loading }) {
       });
     } else {
       if (!pdfFile) return;
-      onSubmit({ pdfFile, topK });
+      onSubmit({ pdfFile, topK, useCohere });
     }
   }
 
@@ -172,8 +173,8 @@ export default function SearchPanel({ onSubmit, loading }) {
       {mode === "pdf" && (
         <div className="flex flex-col gap-2">
           <p className="font-body text-xs italic text-parchment-200/40">
-            Se extrae el texto vía Docling y se trata como necesidad temporal — nunca se
-            persiste, mismo mecanismo que el modo de texto libre.
+            Se extrae el texto vía Docling y se procesa con LightRAG + Cohere para análisis
+            mejorado del grafo institucional.
           </p>
           <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-gold-500/25 bg-ink-950/50 px-3 py-7 text-center transition hover:border-gold-500/60 hover:bg-ink-950/70">
             <input
@@ -187,6 +188,17 @@ export default function SearchPanel({ onSubmit, loading }) {
             </span>
             <span className="font-mono text-[11px] text-parchment-200/35">
               {pdfFile ? `${(pdfFile.size / 1024).toFixed(0)} KB` : "Solo .pdf"}
+            </span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={useCohere}
+              onChange={(e) => setUseCohere(e.target.checked)}
+              className="accent-gold-500"
+            />
+            <span className="font-body text-xs text-parchment-200/70">
+              Usar Cohere LLM para re-ranking y generación de oportunidades
             </span>
           </label>
         </div>

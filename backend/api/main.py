@@ -30,7 +30,7 @@ app = FastAPI(title="SaberLink API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -128,6 +128,107 @@ async def query_pdf(file: UploadFile = File(...), top_k: int = config.DEFAULT_TO
             raise HTTPException(status_code=503, detail="Docling no está instalado en el servidor") from exc
         except Exception as exc:
             raise HTTPException(status_code=422, detail=f"No se pudo procesar el PDF: {exc}") from exc
+
+
+async def _parse_and_query_pdf_enhanced(tmp_path: Path, top_k: int, use_cohere: bool) -> dict:
+    """Runs async — LightRAG + Cohere enhanced PDF processing."""
+    out = await pipeline.run_hybrid_query_async(str(tmp_path), use_cohere=use_cohere, top_k=top_k)
+    source_label = Path(tmp_path).name
+    
+    # For PDF (TEMP-xxxx source), build graph directly from results
+    # since the source doesn't exist in the institutional graph
+    source_id = out["source"]["id"]
+    entity_lookup = _entity_lookup()
+    
+    nodes: dict[str, dict] = {}
+    edges: list[dict] = []
+    
+    # Add source node
+    nodes[source_id] = {
+        "id": source_id,
+        "label": source_label[:60],
+        "type": "NEED",
+        "type_label": "Necesidad (PDF)",
+        "color": "#f59e0b",  # gold color for PDF source
+        "role": "source",
+    }
+    
+    # Add result nodes and edges
+    for r in out["results"]:
+        target_id = r["target"]["id"]
+        score = r["relevance"]["score"]
+        band = r["relevance"]["label"]
+        
+        # Get entity info from lookup
+        row = entity_lookup.get(target_id)
+        entity_type = (row or {}).get("entity_type", "?")
+        
+        # Use proper display name
+        spec = schema.ENTITY_SPECS.get(entity_type)
+        name_field = spec.name_field if spec else None
+        if name_field and row and row.get(name_field):
+            label = str(row[name_field])[:60]
+        else:
+            label = target_id
+        
+        nodes[target_id] = {
+            "id": target_id,
+            "label": label,
+            "type": entity_type,
+            "type_label": viz.ENTITY_TYPE_LABELS.get(entity_type, entity_type),
+            "color": viz.ENTITY_TYPE_COLORS.get(entity_type, viz.DEFAULT_COLOR),
+            "role": "result",
+        }
+        
+        edges.append({
+            "source": source_id,
+            "target": target_id,
+            "kind": "discovery",
+            "score": score,
+            "band": band,
+            "color": viz.SCORE_BAND_COLORS.get(band, viz.DEFAULT_COLOR),
+            "label": f"{score:.2f}",
+            "tooltip": r.get("explanation", ""),
+        })
+    
+    out["graph"] = {
+        "source_id": source_id,
+        "nodes": list(nodes.values()),
+        "edges": edges,
+    }
+    return out
+
+
+@app.post("/query/pdf/enhanced")
+async def query_pdf_enhanced(
+    file: UploadFile = File(...),
+    top_k: int = config.DEFAULT_TOP_K,
+    use_cohere: bool = True,
+) -> dict:
+    """[PLUS] Enhanced PDF query with LightRAG + Cohere.
+    
+    Processes PDF with LightRAG to extract entities and build a knowledge graph,
+    then combines results with institutional search and enhances with Cohere LLM
+    for better re-ranking and opportunity generation.
+    """
+    if file.content_type not in ("application/pdf", "application/octet-stream") and not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Se espera un archivo PDF")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / file.filename
+        tmp_path.write_bytes(await file.read())
+        try:
+            return await _parse_and_query_pdf_enhanced(tmp_path, top_k, use_cohere)
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="LightRAG/Cohere integration no está instalada. "
+                "Instala dependencias: pip install lightrag cohere pymupdf4llm"
+            ) from exc
+        except Exception as exc:
+            import traceback
+            error_detail = f"No se pudo procesar el PDF: {str(exc)}\n\n{traceback.format_exc()}"
+            raise HTTPException(status_code=422, detail=error_detail) from exc
 
 
 @app.get("/graph")
