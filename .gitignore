@@ -25,6 +25,9 @@ frontend/dist/
 frontend/.vite/
 frontend/.env
 
+# Backend
+backend/.env
+
 # OS / editor
 .DS_Store
 Thumbs.db

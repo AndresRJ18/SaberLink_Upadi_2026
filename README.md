@@ -23,16 +23,17 @@ saberlink/
 | Etapa | Herramienta |
 |---|---|
 | Ingesta + normalización | pandas |
-| Embeddings | sentence-transformers (`paraphrase-multilingual-MiniLM-L12-v2`) |
+| Embeddings | sentence-transformers (`all-mpnet-base-v2`, 768 dims) |
 | Guardado de vectores | ChromaDB (persistente local, 1 colección) |
 | Grafo de relaciones explícitas | networkx |
 | Descubrimiento + scoring | Python propio, sin librería externa |
-| Generador de oportunidades | reglas en Python (if/else), sin IA generativa |
+| Generador de oportunidades (núcleo) | reglas en Python (if/else), sin IA generativa |
+| Generador de oportunidades [PLUS] | Cohere LLM (command-r-plus-08-2024) |
 | API | FastAPI + uvicorn |
 | Frontend | React + Vite + Tailwind + Cytoscape.js |
 | Interfaz alternativa [PLUS] | Streamlit + pyvis, Jupyter Notebook |
 | PDF de usuario [PLUS] | Docling |
-| PDF mejorado [PLUS] | LightRAG + Cohere (búsqueda híbrida + re-ranking) |
+| PDF mejorado [PLUS] | LightRAG + Cohere (búsqueda híbrida + re-ranking + oportunidades IA) |
 
 El núcleo no usa LLMs — la explicación en texto es 100% generada por templates
 de string sobre el breakdown ya calculado. Sin cloud deploy — corre local.
@@ -49,10 +50,13 @@ pip install -r requirements.txt
 ```
 
 Requiere Python 3.11+. La primera vez que se use el modelo de embeddings,
-`sentence-transformers` lo descarga de Hugging Face (~470 MB) — no requiere
+`sentence-transformers` lo descarga de Hugging Face (~420 MB) — no requiere
 `HF_TOKEN` para uso anónimo (con límite de tasa más bajo).
 
 Colocá el dataset oficial en `data/raw/` — ver [`data/README.md`](data/README.md).
+
+Para usar las funciones avanzadas de PDF (LightRAG + Cohere), copia `backend/.env.example`
+a `backend/.env` y configura tu API key de Cohere.
 
 ## Cómo reproducir la demo, de cero
 
@@ -180,13 +184,17 @@ print(out["meta"])  # {"cohere_used": true, "institutional_results": X, "pdf_res
 Este modo combina:
 - Búsqueda en conocimiento institucional (sentence-transformers + ChromaDB)
 - Búsqueda en grafo del PDF (LightRAG)
-- Re-ranking con Cohere API
-- Generación de oportunidades mejoradas con LLM
+- Re-ranking con Cohere API (modelo `rerank-english-v3.0`)
+- Generación de oportunidades mejoradas con LLM (modelo `command-r-plus-08-2024`, en español)
 
 Para usar esta funcionalidad, instala las dependencias adicionales:
 ```powershell
 pip install lightrag cohere pymupdf4llm
-export COHERE_API_KEY="tu-api-key"  # o en .env
+```
+
+Configura tu API key en `backend/.env`:
+```bash
+COHERE_API_KEY=tu-api-key-aqui
 ```
 
 **Uso via API:**
